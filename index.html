@@ -1,0 +1,315 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Fractal Land Simulation 0.1</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				color: #61443e;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+
+				background-color: #aaccff;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				color: #ffffff;
+				position: absolute;
+				top: 0px; width: 100%;
+				padding: 5px;
+			}
+
+			a {
+
+				color: yellow;
+			}
+
+			#oldie {
+				background:rgb(0,0,50) !important;
+				color:#fff !important;
+			}
+
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+		<div id="info"><a href="http://threejs.org" target="_blank">three.js</a> - dynamic geometry demo - webgl<br />(left click: forward, right click: backward)</div>
+
+		<script src="./three.min.js"></script>
+
+		<script src="./FirstPersonControls.js"></script>
+
+		<script src="./Detector.js"></script>
+		<!-- script src="./stats.min.js"></script -->
+
+		<script>
+
+			if ( ! Detector.webgl ) {
+
+				Detector.addGetWebGLMessage();
+				document.getElementById( 'container' ).innerHTML = "";
+
+			}
+
+			var container, stats;
+
+			var camera, controls, scene, renderer;
+
+			var mesh, texture, geometry, material;
+			
+			var mag, fcX, fcY, maxIter; // magnification factor, fractal center X, fractal center Y
+
+			// TEST COORDS 01
+			fcX = -0.0438;
+			fcY = 0.9867;
+			mag = 54;
+			maxIter = 500;
+			
+				
+			// specify size of world
+			var worldWidth = 256, worldDepth = 256,
+			worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
+			
+			// How many world units equals one (unmagnified) unit fractal space?
+			var scaleFactor = 10000;
+
+			var clock = new THREE.Clock();
+
+			init();
+		  animate();
+
+			function init() {
+
+				container = document.getElementById( 'container' );
+
+				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
+				camera.position.y = 200;
+
+				controls = new THREE.FirstPersonControls( camera );
+				controls.movementSpeed = 1500;
+				controls.lookSpeed = 0.1;
+
+				scene = new THREE.Scene();
+				//scene.fog = new THREE.FogExp2( 0xaaccff, 0.0007 );
+
+				geometry = new THREE.PlaneGeometry( 20000, 20000, worldWidth - 1, worldDepth - 1 );
+				geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
+				geometry.dynamic = true;
+
+				var i, j, il, jl;
+				// var worldX, worldY;
+				// var cX, cY;
+				
+				// alert("v0: x=" + geometry.vertices[10].x + "\n" +
+				//       "    y=" + geometry.vertices[10].y + "\n" + 
+				//       "    z=" + geometry.vertices[10].z);
+
+				for ( i = 0, il = geometry.vertices.length; i < il; i ++ ) {
+
+					//geometry.vertices[ i ].y = 35 * Math.sin( i/2 );
+				   //worldX = geometry.vertices[i].x;
+				   //worldY = geometry.vertices[i].z;
+				   //cX = worldX / (scaleFactor * mag); 
+				   //cY = worldY / (scaleFactor * mag);
+				   //arrCalc = getIter(cX, cY, 10, 300);
+				   //geometry.vertices[i].y = arrCalc[0];
+				   geometry.vertices[i].y = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+				   
+				   //if (i%2345==0) {
+				   //	alert("x=" + geometry.vertices[i].x + "\n" +
+				   //    "    z=" + geometry.vertices[i].z + "\n" + 
+				   //    "    y=" + geometry.vertices[i].y);
+				   //}
+
+				}
+
+				//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
+
+				geometry.computeFaceNormals();
+				geometry.computeVertexNormals();
+
+				var texture = THREE.ImageUtils.loadTexture( "./grid.jpg" );
+				texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+				texture.repeat.set( 5, 5 );
+
+				material = new THREE.MeshBasicMaterial( { color: 0x0044ff, map: texture } );
+
+				mesh = new THREE.Mesh( geometry, material );
+				scene.add( mesh );
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setClearColor( 0xaaccff, 1 );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				container.innerHTML = "";
+
+				container.appendChild( renderer.domElement );
+
+			// 	stats = new Stats();
+			// 	stats.domElement.style.position = 'absolute';
+			// 	stats.domElement.style.top = '0px';
+			// 	container.appendChild( stats.domElement );
+
+				//
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			function calcWorldY(worldX, worldZ) {
+				cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
+				cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
+				arrCalc = getIter(cX, cY, 10, maxIter);
+				return arrCalc[0];
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				controls.handleResize();
+
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+				//stats.update();
+
+			}
+
+			function render() {
+
+				var delta = clock.getDelta(),
+					time = clock.getElapsedTime() * 10;
+
+				// determine height values
+				// reasonable range: 0-100?
+				// TEST COORDS 01
+				// double cfX = -0.25d;
+				// double cfY = 1.0d;
+				// double fmag = 3.0d;
+				var worldX, worldY;
+				var cX, cY;
+				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+
+					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
+				   //geometry.vertices[i].y = (i-8192)/8;
+				   //worldX = geometry.vertices[i].x;
+				   //worldY = geometry.vertices[i].z;
+				   //cX = worldX / (scaleFactor * mag); // last is magFactor
+				   //cY = worldY / (scaleFactor * mag);
+				   //arrCalc = getIter(cX, cY, 10, 300);
+				   //geometry.vertices[i].y = arrCalc[0];
+				   geometry.vertices[i].y = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+
+				}
+
+				//geometry.computeFaceNormals();
+				//geometry.computeVertexNormals();
+
+				mesh.geometry.verticesNeedUpdate = true;
+				//mesh.geometry.normalsNeedUpdate = true;
+
+				controls.update( delta );
+				renderer.render( scene, camera );
+
+			}
+			
+			/*
+ * Mandelbrot calculation equation
+ * Derived from: 
+ *    The Mandelbrot Set, in HTML5 canvas and javascript.
+ *    https://github.com/cslarsen/mandelbrot-js
+ *    Copyright (C) 2012 Christian Stigen Larsen
+ *    Licensed under the Apache License, Version 2.0 (the "License"); you may
+ *    not use this file except in compliance with the License.  You may obtain
+ *    a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ *
+ * Returns number of iterations and values of Z_{n}^2 = Tr + Ti at the time
+ * we either converged (n == iterations) or diverged.  We use these to
+ * determined the color at the current pixel.
+ *
+ * The Mandelbrot set is rendered taking
+ *
+ *     Z_{n+1} = Z_{n} + C
+ *
+ * with C = x + iy, based on the "look at" coordinates.
+ *
+ * The Julia set can be rendered by taking
+ *
+ *     Z_{0} = C = x + iy
+ *     Z_{n+1} = Z_{n} + K
+ *
+ * for some arbitrary constant K.  The point C for Z_{0} must be the
+ * current pixel we're rendering, but K could be based on the "look at"
+ * coordinate, or by letting the user select a point on the screen.
+ */
+function getIter(Cr, Ci, escapeRadius, maxIter)
+{
+  var Zr = 0;
+  var Zi = 0;
+  var Tr = 0;
+  var Ti = 0;
+  var n  = 0;
+
+  for ( ; n<maxIter && (Tr+Ti)<=escapeRadius; ++n ) {
+    Zi = 2 * Zr * Zi + Ci;
+    Zr = Tr - Ti + Cr;
+    Tr = Zr * Zr;
+    Ti = Zi * Zi;
+  }
+
+  /*
+   * Four more iterations to decrease error term;
+   * see http://linas.org/art-gallery/escape/escape.html
+   */
+  for ( var e=0; e<4; ++e ) {
+    Zi = 2 * Zr * Zi + Ci;
+    Zr = Tr - Ti + Cr;
+    Tr = Zr * Zr;
+    Ti = Zi * Zi;
+  }
+
+  return [n, Tr, Ti];
+}
+
+			
+			// function getIter(worldX, worldY, scaleFactor, magFactor, maxIter) {
+			// 	var fractX = worldX / scaleFactor / magFactor;
+			// 	var fractY = worldY / scaleFactor / magFactor;
+			// 	var zX = 0, zY = 0, cX = fractX, cY = fractY;
+			// 	var iter = 0, tmp = 0;
+				
+			// 	while (zX * zX + zY * zY < 16 && iter <= maxIter) {
+			// 		tmp = zX * zX - zY * zY + cX;
+			// 		zY = 2.0 * zX * zY + cY;
+			// 		zX = tmp;
+			// 		iter++;
+			// 	}
+				
+			// 	return iter;
+			// }
+
+		</script>
+
+	</body>
+</html>
