@@ -72,12 +72,12 @@
 			maxIter = 500;
 			
 				
-			// specify size of world
-			var worldWidth = 256, worldDepth = 256,
+			// specify resolution of the world
+			var worldWidth = 512, worldDepth = 512,
 			worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
 			
 			// How many world units equals one (unmagnified) unit fractal space?
-			var scaleFactor = 10000;
+			var scaleFactor = 2500;
 
 			var clock = new THREE.Clock();
 
@@ -89,7 +89,7 @@
 				container = document.getElementById( 'container' );
 
 				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
-				camera.position.y = 200;
+				camera.position.y = 500;
 
 				controls = new THREE.FirstPersonControls( camera );
 				controls.movementSpeed = 1500;
@@ -98,7 +98,7 @@
 				scene = new THREE.Scene();
 				//scene.fog = new THREE.FogExp2( 0xaaccff, 0.0007 );
 
-				geometry = new THREE.PlaneGeometry( 20000, 20000, worldWidth - 1, worldDepth - 1 );
+				geometry = new THREE.PlaneGeometry( 5000, 5000, worldWidth - 1, worldDepth - 1 );
 				geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
 				geometry.dynamic = true;
 
@@ -163,10 +163,11 @@
 			}
 
 			function calcWorldY(worldX, worldZ) {
-				cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
-				cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
-				arrCalc = getIter(cX, cY, 10, maxIter);
-				return arrCalc[0];
+				var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
+				var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
+				var arrCalc = getIter(cX, cY, 10, maxIter);
+				var returnVal = arrCalc[0];
+				return returnVal;
 			}
 
 			function onWindowResize() {
@@ -196,26 +197,19 @@
 				var delta = clock.getDelta(),
 					time = clock.getElapsedTime() * 10;
 
-				// determine height values
-				// reasonable range: 0-100?
-				// TEST COORDS 01
-				// double cfX = -0.25d;
-				// double cfY = 1.0d;
-				// double fmag = 3.0d;
-				var worldX, worldY;
-				var cX, cY;
+				var worldY;
 				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 
 					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
 				   //geometry.vertices[i].y = (i-8192)/8;
-				   //worldX = geometry.vertices[i].x;
-				   //worldY = geometry.vertices[i].z;
-				   //cX = worldX / (scaleFactor * mag); // last is magFactor
-				   //cY = worldY / (scaleFactor * mag);
-				   //arrCalc = getIter(cX, cY, 10, 300);
-				   //geometry.vertices[i].y = arrCalc[0];
-				   geometry.vertices[i].y = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+				   geometry.vertices[i].y = worldY;
+				}
 
+				// log spread
+				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+					var logged = Math.log(Math.log(geometry.vertices[i].y)) * 500;
+					geometry.vertices[i].y = logged;
 				}
 
 				//geometry.computeFaceNormals();
@@ -288,6 +282,21 @@ function getIter(Cr, Ci, escapeRadius, maxIter)
     Tr = Zr * Zr;
     Ti = Zi * Zi;
   }
+
+	// smooth coloring algorithm from linas.org
+	//var modulus = Math.sqrt(Tr*Tr+Ti*Ti);
+	//var mu = (n - (Math.log(Math.log(modulus))) / Math.log(2.0)) / maxIter;
+
+  // if ( n < maxIter ) {
+  //   var zn = Math.sqrt( Tr*Tr + Ti*Ti );
+  //   var nu = Math.log( Math.log(zn) / Math.log(2) ) / Math.log(2);
+  //   // Rearranging the potential function.
+  //   // Could remove the sqrt and multiply log(zn) by 1/2, but less clear.
+  //   // Dividing log(zn) by log(2) instead of log(N = 1<<8)
+  //   // because we want the entire palette to range from the
+  //   // center to radius 2, NOT our bailout radius.
+  //   n = n + 1 - nu;
+  // }
 
   return [n, Tr, Ti];
 }
