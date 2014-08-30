@@ -73,7 +73,7 @@
 			
 				
 			// specify resolution of the world
-			var worldWidth = 512, worldDepth = 512,
+			var worldWidth = 256, worldDepth = 256,
 			worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
 			
 			// How many world units equals one (unmagnified) unit fractal space?
@@ -98,7 +98,7 @@
 				scene = new THREE.Scene();
 				//scene.fog = new THREE.FogExp2( 0xaaccff, 0.0007 );
 
-				geometry = new THREE.PlaneGeometry( 5000, 5000, worldWidth - 1, worldDepth - 1 );
+				geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
 				geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
 				geometry.dynamic = true;
 
@@ -110,23 +110,14 @@
 				//       "    y=" + geometry.vertices[10].y + "\n" + 
 				//       "    z=" + geometry.vertices[10].z);
 
-				for ( i = 0, il = geometry.vertices.length; i < il; i ++ ) {
+				var worldY;
+				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 
-					//geometry.vertices[ i ].y = 35 * Math.sin( i/2 );
-				   //worldX = geometry.vertices[i].x;
-				   //worldY = geometry.vertices[i].z;
-				   //cX = worldX / (scaleFactor * mag); 
-				   //cY = worldY / (scaleFactor * mag);
-				   //arrCalc = getIter(cX, cY, 10, 300);
-				   //geometry.vertices[i].y = arrCalc[0];
-				   geometry.vertices[i].y = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
-				   
-				   //if (i%2345==0) {
-				   //	alert("x=" + geometry.vertices[i].x + "\n" +
-				   //    "    z=" + geometry.vertices[i].z + "\n" + 
-				   //    "    y=" + geometry.vertices[i].y);
-				   //}
-
+					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
+				   //geometry.vertices[i].y = (i-8192)/8;
+				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+				   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
+				   geometry.vertices[i].y = worldY;
 				}
 
 				//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
@@ -203,13 +194,8 @@
 					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
 				   //geometry.vertices[i].y = (i-8192)/8;
 				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+				   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
 				   geometry.vertices[i].y = worldY;
-				}
-
-				// log spread
-				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					var logged = Math.log(Math.log(geometry.vertices[i].y)) * 500;
-					geometry.vertices[i].y = logged;
 				}
 
 				//geometry.computeFaceNormals();
@@ -224,100 +210,83 @@
 			}
 			
 			/*
- * Mandelbrot calculation equation
- * Derived from: 
- *    The Mandelbrot Set, in HTML5 canvas and javascript.
- *    https://github.com/cslarsen/mandelbrot-js
- *    Copyright (C) 2012 Christian Stigen Larsen
- *    Licensed under the Apache License, Version 2.0 (the "License"); you may
- *    not use this file except in compliance with the License.  You may obtain
- *    a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
- *    Unless required by applicable law or agreed to in writing, software
- *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
- *    License for the specific language governing permissions and limitations
- *    under the License.
- *
- * Returns number of iterations and values of Z_{n}^2 = Tr + Ti at the time
- * we either converged (n == iterations) or diverged.  We use these to
- * determined the color at the current pixel.
- *
- * The Mandelbrot set is rendered taking
- *
- *     Z_{n+1} = Z_{n} + C
- *
- * with C = x + iy, based on the "look at" coordinates.
- *
- * The Julia set can be rendered by taking
- *
- *     Z_{0} = C = x + iy
- *     Z_{n+1} = Z_{n} + K
- *
- * for some arbitrary constant K.  The point C for Z_{0} must be the
- * current pixel we're rendering, but K could be based on the "look at"
- * coordinate, or by letting the user select a point on the screen.
- */
-function getIter(Cr, Ci, escapeRadius, maxIter)
-{
-  var Zr = 0;
-  var Zi = 0;
-  var Tr = 0;
-  var Ti = 0;
-  var n  = 0;
-
-  for ( ; n<maxIter && (Tr+Ti)<=escapeRadius; ++n ) {
-    Zi = 2 * Zr * Zi + Ci;
-    Zr = Tr - Ti + Cr;
-    Tr = Zr * Zr;
-    Ti = Zi * Zi;
-  }
-
-  /*
-   * Four more iterations to decrease error term;
-   * see http://linas.org/art-gallery/escape/escape.html
-   */
-  for ( var e=0; e<4; ++e ) {
-    Zi = 2 * Zr * Zi + Ci;
-    Zr = Tr - Ti + Cr;
-    Tr = Zr * Zr;
-    Ti = Zi * Zi;
-  }
-
-	// smooth coloring algorithm from linas.org
-	//var modulus = Math.sqrt(Tr*Tr+Ti*Ti);
-	//var mu = (n - (Math.log(Math.log(modulus))) / Math.log(2.0)) / maxIter;
-
-  // if ( n < maxIter ) {
-  //   var zn = Math.sqrt( Tr*Tr + Ti*Ti );
-  //   var nu = Math.log( Math.log(zn) / Math.log(2) ) / Math.log(2);
-  //   // Rearranging the potential function.
-  //   // Could remove the sqrt and multiply log(zn) by 1/2, but less clear.
-  //   // Dividing log(zn) by log(2) instead of log(N = 1<<8)
-  //   // because we want the entire palette to range from the
-  //   // center to radius 2, NOT our bailout radius.
-  //   n = n + 1 - nu;
-  // }
-
-  return [n, Tr, Ti];
-}
-
+			 * Mandelbrot calculation equation
+			 * Derived from: 
+			 *    The Mandelbrot Set, in HTML5 canvas and javascript.
+			 *    https://github.com/cslarsen/mandelbrot-js
+			 *    Copyright (C) 2012 Christian Stigen Larsen
+			 *    Licensed under the Apache License, Version 2.0 (the "License"); you may
+			 *    not use this file except in compliance with the License.  You may obtain
+			 *    a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+			 *    Unless required by applicable law or agreed to in writing, software
+			 *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+			 *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
+			 *    License for the specific language governing permissions and limitations
+			 *    under the License.
+			 *
+			 * Returns number of iterations and values of Z_{n}^2 = Tr + Ti at the time
+			 * we either converged (n == iterations) or diverged.  We use these to
+			 * determined the color at the current pixel.
+			 *
+			 * The Mandelbrot set is rendered taking
+			 *
+			 *     Z_{n+1} = Z_{n} + C
+			 *
+			 * with C = x + iy, based on the "look at" coordinates.
+			 *
+			 * The Julia set can be rendered by taking
+			 *
+			 *     Z_{0} = C = x + iy
+			 *     Z_{n+1} = Z_{n} + K
+			 *
+			 * for some arbitrary constant K.  The point C for Z_{0} must be the
+			 * current pixel we're rendering, but K could be based on the "look at"
+			 * coordinate, or by letting the user select a point on the screen.
+			 */
+			function getIter(Cr, Ci, escapeRadius, maxIter)
+			{
+			  var Zr = 0;
+			  var Zi = 0;
+			  var Tr = 0;
+			  var Ti = 0;
+			  var n  = 0;
 			
-			// function getIter(worldX, worldY, scaleFactor, magFactor, maxIter) {
-			// 	var fractX = worldX / scaleFactor / magFactor;
-			// 	var fractY = worldY / scaleFactor / magFactor;
-			// 	var zX = 0, zY = 0, cX = fractX, cY = fractY;
-			// 	var iter = 0, tmp = 0;
-				
-			// 	while (zX * zX + zY * zY < 16 && iter <= maxIter) {
-			// 		tmp = zX * zX - zY * zY + cX;
-			// 		zY = 2.0 * zX * zY + cY;
-			// 		zX = tmp;
-			// 		iter++;
-			// 	}
-				
-			// 	return iter;
-			// }
-
+			  for ( ; n<maxIter && (Tr+Ti)<=escapeRadius; ++n ) {
+			    Zi = 2 * Zr * Zi + Ci;
+			    Zr = Tr - Ti + Cr;
+			    Tr = Zr * Zr;
+			    Ti = Zi * Zi;
+			  }
+			
+			  /*
+			   * Four more iterations to decrease error term;
+			   * see http://linas.org/art-gallery/escape/escape.html
+			   */
+			  for ( var e=0; e<4; ++e ) {
+			    Zi = 2 * Zr * Zi + Ci;
+			    Zr = Tr - Ti + Cr;
+			    Tr = Zr * Zr;
+			    Ti = Zi * Zi;
+			  }
+			
+				// smooth coloring algorithm from linas.org
+				//var modulus = Math.sqrt(Tr*Tr+Ti*Ti);
+				//var mu = (n - (Math.log(Math.log(modulus))) / Math.log(2.0)) / maxIter;
+			
+			  if ( n < maxIter ) {
+			    var zn = Math.sqrt( Tr*Tr + Ti*Ti );
+			    var nu = Math.log( Math.log(zn) / Math.log(2) ) / Math.log(2);
+			    // Rearranging the potential function.
+			    // Could remove the sqrt and multiply log(zn) by 1/2, but less clear.
+			    // Dividing log(zn) by log(2) instead of log(N = 1<<8)
+			    // because we want the entire palette to range from the
+			    // center to radius 2, NOT our bailout radius.
+			    n = n + 1 - nu;
+			  }
+			
+			  return [n, Tr, Ti];
+			}
+			
 		</script>
 
 	</body>
