@@ -112,16 +112,22 @@
 				//       "    y=" + geometry.vertices[10].y + "\n" + 
 				//       "    z=" + geometry.vertices[10].z);
 
-				var worldY;
+				var worldY, stretchedY
 				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 
 					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
 				   //geometry.vertices[i].y = (i-8192)/8;
 				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
-				   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
-				   geometry.vertices[i].y = worldY;
+				   
+				   // log stretch
+				   stretchedY = (Math.log(Math.log(worldY)) * 500) - 500;
+				   geometry.vertices[i].y = stretchedY;
 				}
-
+				
+				for (var z = 0; z < 5; z++) {
+					erodeLandscape();
+				}
+	
 				//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
 
 				geometry.computeFaceNormals();
@@ -161,6 +167,107 @@
 				var arrCalc = getIter(cX, cY, 10, maxIter);
 				var returnVal = arrCalc[0];
 				return returnVal;
+			}
+			
+			function erodeLandscape() {
+					// erode the landscape
+					var erosion = [];
+					var iTarget; // verext to which erosion will flow
+					var iN, iW, iE, iS;
+					var hnN, hnW, hnE, hnS; 
+					//var testi = 32345;
+					//alert("Original height of i = " + geometry.vertices[testi].y);
+					for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+						iN = getNeighborIndex(i, worldWidth, "N");
+						iW = getNeighborIndex(i, worldWidth, "W");
+						iE = getNeighborIndex(i, worldWidth, "E");
+						iS = getNeighborIndex(i, worldWidth, "S");
+						if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
+						if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
+						if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
+						if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
+						erosion = erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
+						geometry.vertices[i].y = erosion[0];
+						iTarget = erosion[1];
+						geometry.vertices[iTarget].y += erosion[2];
+					}
+					//alert("New height of vertex[" + testi + "] = " + geometry.vertices[testi].y);
+
+				}
+			
+			function erodeHeight (i, hi, hnN, hnW, hnE, hnS, iSideSize) {
+				// hi is the height of the current cell, i
+				// hnX is the height of the neightbor to the X direction
+				var maxHeightDiff = 0;
+				var testHeightDiff;
+				var neighbor = "";
+				var tallShort = "";
+				
+				var talusAngle = 5; // 4/width of map
+				
+				if (hnN!=null) {
+					testHeightDiff = hi - hnN;
+					if (testHeightDiff > maxHeightDiff) {
+						maxHeightDiff = testHeightDiff;
+						neighbor = "hnN";
+						if (hi > hnN) {tallShort = "taller";} else {tallShort = "shorter";}
+					}
+				}
+				if (hnW!=null) {
+					testHeightDiff = hi - hnW;
+					if (testHeightDiff > maxHeightDiff) {
+						maxHeightDiff = testHeightDiff;
+						neighbor = "hnW";
+						if (hi > hnW) {tallShort = "taller";} else {tallShort = "shorter";}
+					}
+				}
+				if (hnE!=null) {
+					testHeightDiff = hi - hnE;
+					if (testHeightDiff > maxHeightDiff) {
+						maxHeightDiff = testHeightDiff;
+						neighbor = "hnE";
+						if (hi > hnE) {tallShort = "taller";} else {tallShort = "shorter";}
+					}
+				}
+				if (hnS!=null) {
+					testHeightDiff = hi - hnS;
+					if (testHeightDiff > maxHeightDiff) {
+						maxHeightDiff = testHeightDiff;
+						neighbor = "hnS";
+						if (hi > hnS) {tallShort = "taller";} else {tallShort = "shorter";}
+					}
+				}
+				// calculate slope
+				var slope = maxHeightDiff; // assumes "run" is 1.0
+				
+				// if slope exceeds talus angle, erode
+				var deltaHeight = 0;
+				var iTarget = i;				
+				if (slope > talusAngle) {
+					// erosion factor
+					deltaHeight = maxHeightDiff / 2;
+					
+					// determine which index the eroded material flows to
+					if (neighbor=="hnW") { iTarget -= 1; }
+					if (neighbor=="hnE") { iTarget += 1; }
+					if (neighbor=="hnN") { iTarget -= iSideSize; }
+					if (neighbor=="hnS") { iTarget += iSideSize; }
+					
+					// perform the erosion
+					if (tallShort=="taller") {
+						hi -= deltaHeight;
+					} else {
+						hi += deltaHeight;
+						deltaHeight *= -1;
+					}
+				}
+				
+				var arrReturn = [];
+				arrReturn.push(hi);
+				arrReturn.push(iTarget);
+				arrReturn.push(deltaHeight);
+				
+				return arrReturn;
 			}
 
 			function getNeighborIndex(i, iSideSize, strDirection) {
@@ -264,7 +371,11 @@
 				   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
 				   geometry.vertices[i].y = worldY;
 				}
-
+				
+				for (var z = 0; z < 2; z++) {
+					erodeLandscape();
+				}
+	
 				//geometry.computeFaceNormals();
 				//geometry.computeVertexNormals();
 
