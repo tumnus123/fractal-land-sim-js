@@ -23,6 +23,14 @@
 				top: 0px; width: 100%;
 				padding: 5px;
 			}
+			
+			#jhStats {
+				position: absolute;
+				top: 0px;
+				width: 100%;
+				padding: 5px;
+				color: #F00;
+			}
 
 			a {
 
@@ -39,7 +47,8 @@
 	<body>
 
 		<div id="container"></div>
-		<div id="info"><a href="http://threejs.org" target="_blank">three.js</a> - dynamic geometry demo - webgl<br />(left click: forward, right click: backward)</div>
+		<div id="jhStats"></div>
+		<!--<div id="info"><a href="http://threejs.org" target="_blank">three.js</a> - dynamic geometry demo - webgl<br />(left click: forward, right click: backward)</div>-->
 
 		<script src="./three.min.js"></script>
 
@@ -120,11 +129,11 @@
 				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
 				   
 				   // log stretch
-				   stretchedY = (Math.log(Math.log(worldY)) * 500) - 500;
+				   stretchedY = (Math.log(Math.log(Math.log(worldY))) * 1000) - 500;
 				   geometry.vertices[i].y = stretchedY;
 				}
 				
-				for (var z = 0; z < 5; z++) {
+				for (var z = 0; z < 7; z++) {
 					erodeLandscape();
 				}
 	
@@ -158,6 +167,70 @@
 				//
 
 				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+
+
+			function render() {
+
+				var delta = clock.getDelta(),
+					time = clock.getElapsedTime() * 10;
+				var needToUpdate = false;
+				
+				var middleVertexIndex = geometry.vertices.length/2;
+				
+				var jhStats = document.getElementById("jhStats");
+				jhStats.innerHTML = "CameraPosX: " + camera.position.x + "<br>" +
+										  "CameraPosZ: " + camera.position.z + "<br>" +
+										  Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x);
+				
+				if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
+					 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
+					//
+					// modify the vertices in some fashion here
+					// 
+					var centerX = geometry.vertices[middleVertexIndex].x;
+					var centerZ = geometry.vertices[middleVertexIndex].z;
+					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+						// move each vertex 0.1% further from the center
+						deltaX = geometry.vertices[i].x - centerX;
+						deltaZ = geometry.vertices[i].z - centerZ;
+						geometry.vertices[i].x += (deltaX*0.001);
+						geometry.vertices[i].z += (deltaZ*0.001);
+						
+					}
+					
+					mesh.geometry.verticesNeedUpdate = true;
+				}
+				
+				if (false) {
+					// update the landscape
+					var worldY;
+					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+	
+						//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
+					   //geometry.vertices[i].y = (i-8192)/8;
+					   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+					   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
+					   geometry.vertices[i].y = worldY;
+					}
+					
+					for (var z = 0; z < 2; z++) {
+						erodeLandscape();
+					}
+		
+					//geometry.computeFaceNormals();
+					//geometry.computeVertexNormals();
+	
+					mesh.geometry.verticesNeedUpdate = true;
+					//mesh.geometry.normalsNeedUpdate = true;
+				} else {
+					geometry = geometry;
+				}
+
+				controls.update( delta );
+				renderer.render( scene, camera );
 
 			}
 
@@ -270,70 +343,6 @@
 				return arrReturn;
 			}
 
-			function getNeighborIndex(i, iSideSize, strDirection) {
-				// Assumes (0,0) is in NW corner.
-				// Returns null if no neighbor in the specified direction
-				
-				var neighborExistsNorth = function(i, iSideSize) {
-					if(i>=iSideSize) { return true; } else { return false;}
-				}
-				var neighborExistsWest = function(i, iSideSize) {
-					if(i%iSideSize!=0) { return true; } else { return false;}
-				}
-				var neighborExistsEast = function(i, iSideSize) {
-					if((i+1)%iSideSize!=0) { return true; } else { return false;}
-				}
-				var neighborExistsSouth = function(i, iSideSize) {
-					if(i<(iSideSize*iSideSize-iSideSize)) { return true; } else { return false;}
-				}
-				
-				var returnVal = null;
-				switch (strDirection.toUpperCase()) {
-					case 'NW':
-						if(neighborExistsNorth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
-							returnVal = i-iSideSize-1;
-						}
-						break;
-					case 'N':
-						if(neighborExistsNorth(i,iSideSize)) {
-							returnVal = i-iSideSize;
-						}
-						break;
-					case 'NE':
-						if(neighborExistsNorth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
-							returnVal = i-iSideSize+1;
-						}
-						break;
-					case 'W':
-						if(neighborExistsWest(i,iSideSize)) {
-							returnVal = i-1;
-						}
-						break;
-					case 'E':
-						if(neighborExistsEast(i,iSideSize)) {
-							returnVal = i+1;
-						}
-						break;
-					case 'SW':
-						if(neighborExistsSouth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
-							returnVal = i+iSideSize-1;
-						}
-						break;
-					case 'S':
-						if(neighborExistsSouth(i,iSideSize)) {
-							returnVal = i+iSideSize;
-						}
-						break;
-					case 'SE':
-						if(neighborExistsSouth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
-							returnVal = i+iSideSize+1;
-						}
-						break;
-					default:
-						break;
-				}
-				return returnVal;
-			}
 
 			function onWindowResize() {
 
@@ -357,35 +366,6 @@
 
 			}
 
-			function render() {
-
-				var delta = clock.getDelta(),
-					time = clock.getElapsedTime() * 10;
-
-				var worldY;
-				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-
-					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
-				   //geometry.vertices[i].y = (i-8192)/8;
-				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
-				   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
-				   geometry.vertices[i].y = worldY;
-				}
-				
-				for (var z = 0; z < 2; z++) {
-					erodeLandscape();
-				}
-	
-				//geometry.computeFaceNormals();
-				//geometry.computeVertexNormals();
-
-				mesh.geometry.verticesNeedUpdate = true;
-				//mesh.geometry.normalsNeedUpdate = true;
-
-				controls.update( delta );
-				renderer.render( scene, camera );
-
-			}
 			
 			/*
 			 * Mandelbrot calculation equation
@@ -465,6 +445,71 @@
 			  return [n, Tr, Ti];
 			}
 			
+						function getNeighborIndex(i, iSideSize, strDirection) {
+				// Assumes (0,0) is in NW corner.
+				// Returns null if no neighbor in the specified direction
+				
+				var neighborExistsNorth = function(i, iSideSize) {
+					if(i>=iSideSize) { return true; } else { return false;}
+				}
+				var neighborExistsWest = function(i, iSideSize) {
+					if(i%iSideSize!=0) { return true; } else { return false;}
+				}
+				var neighborExistsEast = function(i, iSideSize) {
+					if((i+1)%iSideSize!=0) { return true; } else { return false;}
+				}
+				var neighborExistsSouth = function(i, iSideSize) {
+					if(i<(iSideSize*iSideSize-iSideSize)) { return true; } else { return false;}
+				}
+				
+				var returnVal = null;
+				switch (strDirection.toUpperCase()) {
+					case 'NW':
+						if(neighborExistsNorth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
+							returnVal = i-iSideSize-1;
+						}
+						break;
+					case 'N':
+						if(neighborExistsNorth(i,iSideSize)) {
+							returnVal = i-iSideSize;
+						}
+						break;
+					case 'NE':
+						if(neighborExistsNorth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
+							returnVal = i-iSideSize+1;
+						}
+						break;
+					case 'W':
+						if(neighborExistsWest(i,iSideSize)) {
+							returnVal = i-1;
+						}
+						break;
+					case 'E':
+						if(neighborExistsEast(i,iSideSize)) {
+							returnVal = i+1;
+						}
+						break;
+					case 'SW':
+						if(neighborExistsSouth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
+							returnVal = i+iSideSize-1;
+						}
+						break;
+					case 'S':
+						if(neighborExistsSouth(i,iSideSize)) {
+							returnVal = i+iSideSize;
+						}
+						break;
+					case 'SE':
+						if(neighborExistsSouth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
+							returnVal = i+iSideSize+1;
+						}
+						break;
+					default:
+						break;
+				}
+				return returnVal;
+			}
+
 		</script>
 
 	</body>
