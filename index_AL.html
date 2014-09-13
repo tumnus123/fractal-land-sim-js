@@ -90,24 +90,26 @@
 
 			var clock = new THREE.Clock();
 
+
 			init();
-		  animate();
+		   animate();
 
 			function init() {
-
 				container = document.getElementById( 'container' );
 
+				scene = new THREE.Scene();
+				//scene.fog = new THREE.FogExp2( 0xaaccff, 0.0007 );
+
 				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
-				camera.position.y = 300;
-				camera.position.x = 0;
-				camera.position.z = 0;
+				// camera.position.y = 100;
+				// camera.position.x = -1500;
+				// camera.position.z = -1500;
+				camera.position.set(-1500,100,-1500);
+				camera.up = new THREE.Vector3(0,1,0);
 
 				controls = new THREE.FirstPersonControls( camera );
 				controls.movementSpeed = 500;
 				controls.lookSpeed = 0.1;
-
-				scene = new THREE.Scene();
-				//scene.fog = new THREE.FogExp2( 0xaaccff, 0.0007 );
 
 				geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
 				geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
@@ -136,11 +138,14 @@
 				for (var z = 0; z < 7; z++) {
 					erodeLandscape();
 				}
-	
+				
 				//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
 
 				geometry.computeFaceNormals();
 				geometry.computeVertexNormals();
+
+				// position the camera above the landscape
+				//camera.position.y = 
 
 				var texture = THREE.ImageUtils.loadTexture( "./grid.jpg" );
 				texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
@@ -150,6 +155,10 @@
 
 				mesh = new THREE.Mesh( geometry, material );
 				scene.add( mesh );
+
+				// TEST
+				// controls.target = new THREE.Vector3(0,0,0);
+
 
 				renderer = new THREE.WebGLRenderer();
 				renderer.setClearColor( 0xaaccff, 1 );
@@ -176,36 +185,35 @@
 
 				var delta = clock.getDelta(),
 					time = clock.getElapsedTime() * 10;
+				
 				var needToUpdate = false;
 				
-				var middleVertexIndex = geometry.vertices.length/2;
+				//var middleVertexIndex = geometry.vertices.length/2;
 				
 				var jhStats = document.getElementById("jhStats");
-				jhStats.innerHTML = "CameraPosX: " + camera.position.x + "<br>" +
-										  "CameraPosZ: " + camera.position.z + "<br>" +
-										  Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x);
+				jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y;
 				
-				if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
-					 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
+				// if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
+				// 	 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
 					//
 					// modify the vertices in some fashion here
 					// 
-					var centerX = geometry.vertices[middleVertexIndex].x;
-					var centerZ = geometry.vertices[middleVertexIndex].z;
-					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-						// move each vertex 0.1% further from the center
-						deltaX = geometry.vertices[i].x - centerX;
-						deltaZ = geometry.vertices[i].z - centerZ;
-						geometry.vertices[i].x += (deltaX*0.001);
-						geometry.vertices[i].z += (deltaZ*0.001);
+					// var centerX = geometry.vertices[middleVertexIndex].x;
+					// var centerZ = geometry.vertices[middleVertexIndex].z;
+					// for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+					// 	// move each vertex 0.1% further from the center
+					// 	deltaX = geometry.vertices[i].x - centerX;
+					// 	deltaZ = geometry.vertices[i].z - centerZ;
+					// 	geometry.vertices[i].x += (deltaX*0.001);
+					// 	geometry.vertices[i].z += (deltaZ*0.001);
 						
-					}
+					// }
 					
-					mesh.geometry.verticesNeedUpdate = true;
-				}
+				// 	mesh.geometry.verticesNeedUpdate = true;
+				// }
 				
+				// Update the landscape
 				if (false) {
-					// update the landscape
 					var worldY;
 					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 	
@@ -227,6 +235,20 @@
 					//mesh.geometry.normalsNeedUpdate = true;
 				} else {
 					geometry = geometry;
+				}
+
+				// update the elevation of the camera
+				var cameraHoverHeight = 150;
+				var eVector = new THREE.Vector3(0,-1,0);
+				var eRayCaster = new THREE.Raycaster(camera.position, eVector);
+				var intersects = eRayCaster.intersectObject(mesh);
+				if (intersects.length > 0) {
+					if (intersects[0].distance > cameraHoverHeight) {
+						camera.position.y -= (intersects[0].distance-cameraHoverHeight)/2;
+					}
+					if (intersects[0].distance < cameraHoverHeight) {
+						camera.position.y += (cameraHoverHeight-intersects[0].distance)/2;
+					}
 				}
 
 				controls.update( delta );
