@@ -51,6 +51,7 @@
 		<!--<div id="info"><a href="http://threejs.org" target="_blank">three.js</a> - dynamic geometry demo - webgl<br />(left click: forward, right click: backward)</div>-->
 
 		<script src="./three.min.js"></script>
+		<script type="text/javascript" src="./fracutils.js"></script>
 
 		<script src="./FirstPersonControls.js"></script>
 
@@ -79,7 +80,6 @@
 			fcY = 0.9867;
 			mag = 54;
 			maxIter = 500;
-			
 				
 			// specify resolution of the world
 			var worldWidth = 256, worldDepth = 256,
@@ -108,7 +108,7 @@
 				camera.up = new THREE.Vector3(0,1,0);
 
 				controls = new THREE.FirstPersonControls( camera );
-				controls.movementSpeed = 500;
+				controls.movementSpeed = 100;
 				controls.lookSpeed = 0.1;
 
 				geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
@@ -238,7 +238,7 @@
 				}
 
 				// update the elevation of the camera
-				var cameraHoverHeight = 150;
+				var cameraHoverHeight = 50;
 				var eVector = new THREE.Vector3(0,-1,0);
 				var eRayCaster = new THREE.Raycaster(camera.position, eVector);
 				var intersects = eRayCaster.intersectObject(mesh);
@@ -255,6 +255,15 @@
 				renderer.render( scene, camera );
 
 			}
+			
+			function densifyWorld(inGeom) {
+				// create a new geometry that's twice as dense as the input
+				// set the xyz of existing vertices
+				// set the xyz of new vertices
+					// when spacing is at minimum, y is half of deltaY of adjacent vertices (0% new Y)
+					// when spacing is at maximum, y is eroded height
+				return outGeom;
+			}
 
 			function calcWorldY(worldX, worldZ) {
 				var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
@@ -270,13 +279,13 @@
 					var iTarget; // verext to which erosion will flow
 					var iN, iW, iE, iS;
 					var hnN, hnW, hnE, hnS; 
-					//var testi = 32345;
 					//alert("Original height of i = " + geometry.vertices[testi].y);
+					var fu = createFracUtils();
 					for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-						iN = getNeighborIndex(i, worldWidth, "N");
-						iW = getNeighborIndex(i, worldWidth, "W");
-						iE = getNeighborIndex(i, worldWidth, "E");
-						iS = getNeighborIndex(i, worldWidth, "S");
+						iN = fu.getNeighborIndex(i, worldWidth, "N");
+						iW = fu.getNeighborIndex(i, worldWidth, "W");
+						iE = fu.getNeighborIndex(i, worldWidth, "E");
+						iS = fu.getNeighborIndex(i, worldWidth, "S");
 						if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
 						if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
 						if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
@@ -467,70 +476,70 @@
 			  return [n, Tr, Ti];
 			}
 			
-						function getNeighborIndex(i, iSideSize, strDirection) {
-				// Assumes (0,0) is in NW corner.
-				// Returns null if no neighbor in the specified direction
+			// function fu.getNeighborIndex(i, iSideSize, strDirection) {
+			// 	// Assumes (0,0) is in NW corner.
+			// 	// Returns null if no neighbor in the specified direction
 				
-				var neighborExistsNorth = function(i, iSideSize) {
-					if(i>=iSideSize) { return true; } else { return false;}
-				}
-				var neighborExistsWest = function(i, iSideSize) {
-					if(i%iSideSize!=0) { return true; } else { return false;}
-				}
-				var neighborExistsEast = function(i, iSideSize) {
-					if((i+1)%iSideSize!=0) { return true; } else { return false;}
-				}
-				var neighborExistsSouth = function(i, iSideSize) {
-					if(i<(iSideSize*iSideSize-iSideSize)) { return true; } else { return false;}
-				}
+			// 	var neighborExistsNorth = function(i, iSideSize) {
+			// 		if(i>=iSideSize) { return true; } else { return false;}
+			// 	}
+			// 	var neighborExistsWest = function(i, iSideSize) {
+			// 		if(i%iSideSize!=0) { return true; } else { return false;}
+			// 	}
+			// 	var neighborExistsEast = function(i, iSideSize) {
+			// 		if((i+1)%iSideSize!=0) { return true; } else { return false;}
+			// 	}
+			// 	var neighborExistsSouth = function(i, iSideSize) {
+			// 		if(i<(iSideSize*iSideSize-iSideSize)) { return true; } else { return false;}
+			// 	}
 				
-				var returnVal = null;
-				switch (strDirection.toUpperCase()) {
-					case 'NW':
-						if(neighborExistsNorth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
-							returnVal = i-iSideSize-1;
-						}
-						break;
-					case 'N':
-						if(neighborExistsNorth(i,iSideSize)) {
-							returnVal = i-iSideSize;
-						}
-						break;
-					case 'NE':
-						if(neighborExistsNorth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
-							returnVal = i-iSideSize+1;
-						}
-						break;
-					case 'W':
-						if(neighborExistsWest(i,iSideSize)) {
-							returnVal = i-1;
-						}
-						break;
-					case 'E':
-						if(neighborExistsEast(i,iSideSize)) {
-							returnVal = i+1;
-						}
-						break;
-					case 'SW':
-						if(neighborExistsSouth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
-							returnVal = i+iSideSize-1;
-						}
-						break;
-					case 'S':
-						if(neighborExistsSouth(i,iSideSize)) {
-							returnVal = i+iSideSize;
-						}
-						break;
-					case 'SE':
-						if(neighborExistsSouth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
-							returnVal = i+iSideSize+1;
-						}
-						break;
-					default:
-						break;
-				}
-				return returnVal;
-			}
+			// 	var returnVal = null;
+			// 	switch (strDirection.toUpperCase()) {
+			// 		case 'NW':
+			// 			if(neighborExistsNorth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
+			// 				returnVal = i-iSideSize-1;
+			// 			}
+			// 			break;
+			// 		case 'N':
+			// 			if(neighborExistsNorth(i,iSideSize)) {
+			// 				returnVal = i-iSideSize;
+			// 			}
+			// 			break;
+			// 		case 'NE':
+			// 			if(neighborExistsNorth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
+			// 				returnVal = i-iSideSize+1;
+			// 			}
+			// 			break;
+			// 		case 'W':
+			// 			if(neighborExistsWest(i,iSideSize)) {
+			// 				returnVal = i-1;
+			// 			}
+			// 			break;
+			// 		case 'E':
+			// 			if(neighborExistsEast(i,iSideSize)) {
+			// 				returnVal = i+1;
+			// 			}
+			// 			break;
+			// 		case 'SW':
+			// 			if(neighborExistsSouth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
+			// 				returnVal = i+iSideSize-1;
+			// 			}
+			// 			break;
+			// 		case 'S':
+			// 			if(neighborExistsSouth(i,iSideSize)) {
+			// 				returnVal = i+iSideSize;
+			// 			}
+			// 			break;
+			// 		case 'SE':
+			// 			if(neighborExistsSouth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
+			// 				returnVal = i+iSideSize+1;
+			// 			}
+			// 			break;
+			// 		default:
+			// 			break;
+			// 	}
+			// 	return returnVal;
+			// }
 
 		</script>
 
