@@ -89,6 +89,7 @@
 			var scaleFactor = 2500;
 
 			var clock = new THREE.Clock();
+			var fractutils = createFracUtils();
 
 
 			init();
@@ -156,10 +157,6 @@
 				mesh = new THREE.Mesh( geometry, material );
 				scene.add( mesh );
 
-				// TEST
-				// controls.target = new THREE.Vector3(0,0,0);
-
-
 				renderer = new THREE.WebGLRenderer();
 				renderer.setClearColor( 0xaaccff, 1 );
 				renderer.setSize( window.innerWidth, window.innerHeight );
@@ -172,8 +169,6 @@
 			// 	stats.domElement.style.position = 'absolute';
 			// 	stats.domElement.style.top = '0px';
 			// 	container.appendChild( stats.domElement );
-
-				//
 
 				window.addEventListener( 'resize', onWindowResize, false );
 
@@ -268,7 +263,7 @@
 			function calcWorldY(worldX, worldZ) {
 				var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
 				var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
-				var arrCalc = getIter(cX, cY, 10, maxIter);
+				var arrCalc = fractutils.getIter(cX, cY, 10, maxIter);
 				var returnVal = arrCalc[0];
 				return returnVal;
 			}
@@ -280,17 +275,16 @@
 					var iN, iW, iE, iS;
 					var hnN, hnW, hnE, hnS; 
 					//alert("Original height of i = " + geometry.vertices[testi].y);
-					var fu = createFracUtils();
 					for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-						iN = fu.getNeighborIndex(i, worldWidth, "N");
-						iW = fu.getNeighborIndex(i, worldWidth, "W");
-						iE = fu.getNeighborIndex(i, worldWidth, "E");
-						iS = fu.getNeighborIndex(i, worldWidth, "S");
+						iN = fractutils.getNeighborIndex(i, worldWidth, "N");
+						iW = fractutils.getNeighborIndex(i, worldWidth, "W");
+						iE = fractutils.getNeighborIndex(i, worldWidth, "E");
+						iS = fractutils.getNeighborIndex(i, worldWidth, "S");
 						if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
 						if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
 						if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
 						if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
-						erosion = erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
+						erosion = fractutils.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
 						geometry.vertices[i].y = erosion[0];
 						iTarget = erosion[1];
 						geometry.vertices[iTarget].y += erosion[2];
@@ -298,82 +292,6 @@
 					//alert("New height of vertex[" + testi + "] = " + geometry.vertices[testi].y);
 
 				}
-			
-			function erodeHeight (i, hi, hnN, hnW, hnE, hnS, iSideSize) {
-				// hi is the height of the current cell, i
-				// hnX is the height of the neightbor to the X direction
-				var maxHeightDiff = 0;
-				var testHeightDiff;
-				var neighbor = "";
-				var tallShort = "";
-				
-				var talusAngle = 5; // 4/width of map
-				
-				if (hnN!=null) {
-					testHeightDiff = hi - hnN;
-					if (testHeightDiff > maxHeightDiff) {
-						maxHeightDiff = testHeightDiff;
-						neighbor = "hnN";
-						if (hi > hnN) {tallShort = "taller";} else {tallShort = "shorter";}
-					}
-				}
-				if (hnW!=null) {
-					testHeightDiff = hi - hnW;
-					if (testHeightDiff > maxHeightDiff) {
-						maxHeightDiff = testHeightDiff;
-						neighbor = "hnW";
-						if (hi > hnW) {tallShort = "taller";} else {tallShort = "shorter";}
-					}
-				}
-				if (hnE!=null) {
-					testHeightDiff = hi - hnE;
-					if (testHeightDiff > maxHeightDiff) {
-						maxHeightDiff = testHeightDiff;
-						neighbor = "hnE";
-						if (hi > hnE) {tallShort = "taller";} else {tallShort = "shorter";}
-					}
-				}
-				if (hnS!=null) {
-					testHeightDiff = hi - hnS;
-					if (testHeightDiff > maxHeightDiff) {
-						maxHeightDiff = testHeightDiff;
-						neighbor = "hnS";
-						if (hi > hnS) {tallShort = "taller";} else {tallShort = "shorter";}
-					}
-				}
-				// calculate slope
-				var slope = maxHeightDiff; // assumes "run" is 1.0
-				
-				// if slope exceeds talus angle, erode
-				var deltaHeight = 0;
-				var iTarget = i;				
-				if (slope > talusAngle) {
-					// erosion factor
-					deltaHeight = maxHeightDiff / 2;
-					
-					// determine which index the eroded material flows to
-					if (neighbor=="hnW") { iTarget -= 1; }
-					if (neighbor=="hnE") { iTarget += 1; }
-					if (neighbor=="hnN") { iTarget -= iSideSize; }
-					if (neighbor=="hnS") { iTarget += iSideSize; }
-					
-					// perform the erosion
-					if (tallShort=="taller") {
-						hi -= deltaHeight;
-					} else {
-						hi += deltaHeight;
-						deltaHeight *= -1;
-					}
-				}
-				
-				var arrReturn = [];
-				arrReturn.push(hi);
-				arrReturn.push(iTarget);
-				arrReturn.push(deltaHeight);
-				
-				return arrReturn;
-			}
-
 
 			function onWindowResize() {
 
@@ -386,8 +304,6 @@
 
 			}
 
-			//
-
 			function animate() {
 
 				requestAnimationFrame( animate );
@@ -396,150 +312,6 @@
 				//stats.update();
 
 			}
-
-			
-			/*
-			 * Mandelbrot calculation equation
-			 * Derived from: 
-			 *    The Mandelbrot Set, in HTML5 canvas and javascript.
-			 *    https://github.com/cslarsen/mandelbrot-js
-			 *    Copyright (C) 2012 Christian Stigen Larsen
-			 *    Licensed under the Apache License, Version 2.0 (the "License"); you may
-			 *    not use this file except in compliance with the License.  You may obtain
-			 *    a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
-			 *    Unless required by applicable law or agreed to in writing, software
-			 *    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-			 *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the
-			 *    License for the specific language governing permissions and limitations
-			 *    under the License.
-			 *
-			 * Returns number of iterations and values of Z_{n}^2 = Tr + Ti at the time
-			 * we either converged (n == iterations) or diverged.  We use these to
-			 * determined the color at the current pixel.
-			 *
-			 * The Mandelbrot set is rendered taking
-			 *
-			 *     Z_{n+1} = Z_{n} + C
-			 *
-			 * with C = x + iy, based on the "look at" coordinates.
-			 *
-			 * The Julia set can be rendered by taking
-			 *
-			 *     Z_{0} = C = x + iy
-			 *     Z_{n+1} = Z_{n} + K
-			 *
-			 * for some arbitrary constant K.  The point C for Z_{0} must be the
-			 * current pixel we're rendering, but K could be based on the "look at"
-			 * coordinate, or by letting the user select a point on the screen.
-			 */
-			function getIter(Cr, Ci, escapeRadius, maxIter)
-			{
-			  var Zr = 0;
-			  var Zi = 0;
-			  var Tr = 0;
-			  var Ti = 0;
-			  var n  = 0;
-			
-			  for ( ; n<maxIter && (Tr+Ti)<=escapeRadius; ++n ) {
-			    Zi = 2 * Zr * Zi + Ci;
-			    Zr = Tr - Ti + Cr;
-			    Tr = Zr * Zr;
-			    Ti = Zi * Zi;
-			  }
-			
-			  /*
-			   * Four more iterations to decrease error term;
-			   * see http://linas.org/art-gallery/escape/escape.html
-			   */
-			  for ( var e=0; e<4; ++e ) {
-			    Zi = 2 * Zr * Zi + Ci;
-			    Zr = Tr - Ti + Cr;
-			    Tr = Zr * Zr;
-			    Ti = Zi * Zi;
-			  }
-			
-				// smooth coloring algorithm from linas.org
-				//var modulus = Math.sqrt(Tr*Tr+Ti*Ti);
-				//var mu = (n - (Math.log(Math.log(modulus))) / Math.log(2.0)) / maxIter;
-			
-			  if ( n < maxIter ) {
-			    var zn = Math.sqrt( Tr*Tr + Ti*Ti );
-			    var nu = Math.log( Math.log(zn) / Math.log(2) ) / Math.log(2);
-			    // Rearranging the potential function.
-			    // Could remove the sqrt and multiply log(zn) by 1/2, but less clear.
-			    // Dividing log(zn) by log(2) instead of log(N = 1<<8)
-			    // because we want the entire palette to range from the
-			    // center to radius 2, NOT our bailout radius.
-			    n = n + 1 - nu;
-			  }
-			
-			  return [n, Tr, Ti];
-			}
-			
-			// function fu.getNeighborIndex(i, iSideSize, strDirection) {
-			// 	// Assumes (0,0) is in NW corner.
-			// 	// Returns null if no neighbor in the specified direction
-				
-			// 	var neighborExistsNorth = function(i, iSideSize) {
-			// 		if(i>=iSideSize) { return true; } else { return false;}
-			// 	}
-			// 	var neighborExistsWest = function(i, iSideSize) {
-			// 		if(i%iSideSize!=0) { return true; } else { return false;}
-			// 	}
-			// 	var neighborExistsEast = function(i, iSideSize) {
-			// 		if((i+1)%iSideSize!=0) { return true; } else { return false;}
-			// 	}
-			// 	var neighborExistsSouth = function(i, iSideSize) {
-			// 		if(i<(iSideSize*iSideSize-iSideSize)) { return true; } else { return false;}
-			// 	}
-				
-			// 	var returnVal = null;
-			// 	switch (strDirection.toUpperCase()) {
-			// 		case 'NW':
-			// 			if(neighborExistsNorth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
-			// 				returnVal = i-iSideSize-1;
-			// 			}
-			// 			break;
-			// 		case 'N':
-			// 			if(neighborExistsNorth(i,iSideSize)) {
-			// 				returnVal = i-iSideSize;
-			// 			}
-			// 			break;
-			// 		case 'NE':
-			// 			if(neighborExistsNorth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
-			// 				returnVal = i-iSideSize+1;
-			// 			}
-			// 			break;
-			// 		case 'W':
-			// 			if(neighborExistsWest(i,iSideSize)) {
-			// 				returnVal = i-1;
-			// 			}
-			// 			break;
-			// 		case 'E':
-			// 			if(neighborExistsEast(i,iSideSize)) {
-			// 				returnVal = i+1;
-			// 			}
-			// 			break;
-			// 		case 'SW':
-			// 			if(neighborExistsSouth(i,iSideSize) && neighborExistsWest(i,iSideSize)) {
-			// 				returnVal = i+iSideSize-1;
-			// 			}
-			// 			break;
-			// 		case 'S':
-			// 			if(neighborExistsSouth(i,iSideSize)) {
-			// 				returnVal = i+iSideSize;
-			// 			}
-			// 			break;
-			// 		case 'SE':
-			// 			if(neighborExistsSouth(i,iSideSize) && neighborExistsEast(i,iSideSize)) {
-			// 				returnVal = i+iSideSize+1;
-			// 			}
-			// 			break;
-			// 		default:
-			// 			break;
-			// 	}
-			// 	return returnVal;
-			// }
 
 		</script>
 
