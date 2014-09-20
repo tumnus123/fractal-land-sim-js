@@ -7,12 +7,12 @@
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<style>
 			body {
-				color: #61443e;
+				color: #000; /*#61443e*/
 				font-family:Monospace;
 				font-size:13px;
 				text-align:center;
 
-				background-color: #aaccff;
+				background-color: #000; /*#aaccff*/
 				margin: 0px;
 				overflow: hidden;
 			}
@@ -99,8 +99,14 @@
 				container = document.getElementById( 'container' );
 
 				scene = new THREE.Scene();
-				//scene.fog = new THREE.FogExp2( 0xaaccff, 0.0007 );
+				scene.fog = new THREE.FogExp2( 0x000000, 0.0007 );
 
+				// LIGHT
+				// var light = new THREE.HemisphereLight(0xffffff,0xffffff,1);
+				// light.position.set(-1300,100,-1300);
+				// scene.add(light);
+
+				// CAMERA
 				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
 				// camera.position.y = 100;
 				// camera.position.x = -1500;
@@ -108,6 +114,7 @@
 				camera.position.set(-1500,100,-1500);
 				camera.up = new THREE.Vector3(0,1,0);
 
+				// ACTION :-)
 				controls = new THREE.FirstPersonControls( camera );
 				controls.movementSpeed = 100;
 				controls.lookSpeed = 0.1;
@@ -145,20 +152,38 @@
 				geometry.computeFaceNormals();
 				geometry.computeVertexNormals();
 
-				// position the camera above the landscape
-				//camera.position.y = 
+				// var texture = THREE.ImageUtils.loadTexture( "./grid.jpg" );
+				// texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+				// texture.repeat.set( 5, 5 );
 
-				var texture = THREE.ImageUtils.loadTexture( "./grid.jpg" );
-				texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-				texture.repeat.set( 5, 5 );
+				// material = new THREE.MeshBasicMaterial( { 
+				// 	color: 0x0044ff, 
+				// 	wireframe: true
+				// } );
+				
+				var vertexColorMaterial  = new THREE.MeshBasicMaterial( { vertexColors: THREE.VertexColors } );
 
-				material = new THREE.MeshBasicMaterial( { color: 0x0044ff, map: texture } );
+				//color the vertices
+				geometry = calcVertexColors(geometry);
+				
+				mesh = new THREE.Mesh( geometry, vertexColorMaterial );
+				//scene.add( mesh );
 
-				mesh = new THREE.Mesh( geometry, material );
-				scene.add( mesh );
+				// "wireframe texture"
+				var wireTexture = new THREE.ImageUtils.loadTexture( './square.png' );
+				wireTexture.wrapS = wireTexture.wrapT = THREE.RepeatWrapping; 
+				wireTexture.repeat.set( 40, 40 );
+
+				var wireMaterial = new THREE.MeshBasicMaterial( { map: wireTexture, vertexColors: THREE.VertexColors } );
+				wireMaterial.map.repeat.set( worldWidth, worldDepth );
+
+				var graphMesh = new THREE.Mesh( geometry, wireMaterial );
+				graphMesh.doubleSided = true;
+				scene.add(graphMesh);
+
 
 				renderer = new THREE.WebGLRenderer();
-				renderer.setClearColor( 0xaaccff, 1 );
+				renderer.setClearColor( 0x000000, 1 ); // 0xaaccff
 				renderer.setSize( window.innerWidth, window.innerHeight );
 
 				container.innerHTML = "";
@@ -258,6 +283,37 @@
 					// when spacing is at minimum, y is half of deltaY of adjacent vertices (0% new Y)
 					// when spacing is at maximum, y is eroded height
 				return outGeom;
+			}
+			
+			function calcVertexColors(geometry) {
+				// calculate vertex colors based on Y (height) values
+				geometry.computeBoundingBox();
+				var yMin = geometry.boundingBox.min.y;
+				var yMax = geometry.boundingBox.max.y;
+				var yRange = yMax - yMin;
+				var color, point, face, numberOfSides, vertexIndex;
+				// faces are indexed using characters
+				var faceIndices = [ 'a', 'b', 'c', 'd' ];
+				// first, assign colors to vertices as desired
+				for ( var i = 0; i < geometry.vertices.length; i++ ) 
+				{
+					point = geometry.vertices[ i ];
+					color = new THREE.Color( 0x0000ff );
+					color.setHSL( 0.7 * (yMax - point.y) / yRange, 0.5, 0.3 );
+					geometry.colors[i] = color; // use this array for convenience
+				}
+				// copy the colors as necessary to the face's vertexColors array.
+				for ( var i = 0; i < geometry.faces.length; i++ ) 
+				{
+					face = geometry.faces[ i ];
+					numberOfSides = ( face instanceof THREE.Face3 ) ? 3 : 4;
+					for( var j = 0; j < numberOfSides; j++ ) 
+					{
+						vertexIndex = face[ faceIndices[ j ] ];
+						face.vertexColors[ j ] = geometry.colors[ vertexIndex ];
+					}
+				}
+				return geometry;
 			}
 
 			function calcWorldY(worldX, worldZ) {
