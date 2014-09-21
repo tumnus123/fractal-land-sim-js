@@ -77,7 +77,7 @@
 
 			// TEST COORDS 01
 			fcX = -0.0438;
-			fcY = 0.9867;
+			fcY = 0.97; // 0.9867
 			mag = 54;
 			maxIter = 500;
 				
@@ -89,7 +89,7 @@
 			var scaleFactor = 2500;
 
 			var clock = new THREE.Clock();
-			var fractutils = createFracUtils();
+			var fu = createFracUtils();
 
 
 			init();
@@ -99,7 +99,7 @@
 				container = document.getElementById( 'container' );
 
 				scene = new THREE.Scene();
-				scene.fog = new THREE.FogExp2( 0x000000, 0.0007 );
+				//scene.fog = new THREE.FogExp2( 0x000000, 0.0007 );
 
 				// LIGHT
 				// var light = new THREE.HemisphereLight(0xffffff,0xffffff,1);
@@ -111,7 +111,7 @@
 				// camera.position.y = 100;
 				// camera.position.x = -1500;
 				// camera.position.z = -1500;
-				camera.position.set(-1500,100,-1500);
+				camera.position.set(0,100,0);
 				camera.up = new THREE.Vector3(0,1,0);
 
 				// ACTION :-)
@@ -152,22 +152,13 @@
 				geometry.computeFaceNormals();
 				geometry.computeVertexNormals();
 
-				// var texture = THREE.ImageUtils.loadTexture( "./grid.jpg" );
-				// texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-				// texture.repeat.set( 5, 5 );
-
-				// material = new THREE.MeshBasicMaterial( { 
-				// 	color: 0x0044ff, 
-				// 	wireframe: true
-				// } );
-				
 				var vertexColorMaterial  = new THREE.MeshBasicMaterial( { vertexColors: THREE.VertexColors } );
 
 				//color the vertices
-				geometry = calcVertexColors(geometry);
+				geometry = fu.calcVertexColors(geometry);
 				
 				mesh = new THREE.Mesh( geometry, vertexColorMaterial );
-				//scene.add( mesh );
+				//scene.add( mesh ); // unnecc -- why?
 
 				// "wireframe texture"
 				var wireTexture = new THREE.ImageUtils.loadTexture( './square.png' );
@@ -232,6 +223,11 @@
 				// 	mesh.geometry.verticesNeedUpdate = true;
 				// }
 				
+				// reposition the player
+				if (Math.abs(camera.position.x) > 256 || Math.abs(camera.position.z) > 256) {
+					resetPosition();
+				}
+				
 				// Update the landscape
 				if (false) {
 					var worldY;
@@ -285,41 +281,44 @@
 				return outGeom;
 			}
 			
-			function calcVertexColors(geometry) {
-				// calculate vertex colors based on Y (height) values
-				geometry.computeBoundingBox();
-				var yMin = geometry.boundingBox.min.y;
-				var yMax = geometry.boundingBox.max.y;
-				var yRange = yMax - yMin;
-				var color, point, face, numberOfSides, vertexIndex;
-				// faces are indexed using characters
-				var faceIndices = [ 'a', 'b', 'c', 'd' ];
-				// first, assign colors to vertices as desired
-				for ( var i = 0; i < geometry.vertices.length; i++ ) 
-				{
-					point = geometry.vertices[ i ];
-					color = new THREE.Color( 0x0000ff );
-					color.setHSL( 0.7 * (yMax - point.y) / yRange, 0.5, 0.3 );
-					geometry.colors[i] = color; // use this array for convenience
+			function resetPosition() {
+				// clone the geometry
+				//var outGeom = inGeom.clone();
+				
+				// freeze the controls
+				controls.freeze = true;
+				
+				// capture the current X and Z diffs
+				var currXdiff = camera.position.x;
+				var currZdiff = camera.position.z;
+				
+				// apply diffs to each vertex
+				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+					geometry.vertices[i].x -= currXdiff;
+					geometry.vertices[i].z -= currZdiff;
+					geometry.verticesNeedUpdate = true;
+					mesh.geometry.verticesNeedUpdate = true;
 				}
-				// copy the colors as necessary to the face's vertexColors array.
-				for ( var i = 0; i < geometry.faces.length; i++ ) 
-				{
-					face = geometry.faces[ i ];
-					numberOfSides = ( face instanceof THREE.Face3 ) ? 3 : 4;
-					for( var j = 0; j < numberOfSides; j++ ) 
-					{
-						vertexIndex = face[ faceIndices[ j ] ];
-						face.vertexColors[ j ] = geometry.colors[ vertexIndex ];
-					}
-				}
-				return geometry;
+				
+				// reposition the camera at 0,0
+				camera.position.x = 0;
+				camera.position.z = 0;
+				
+				// unfreeze the controls
+				controls.freeze = false;
+				
+				// return the new geometry
+				//return outGeom;
+				
+				
 			}
+			
+			
 
 			function calcWorldY(worldX, worldZ) {
 				var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
 				var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
-				var arrCalc = fractutils.getIter(cX, cY, 10, maxIter);
+				var arrCalc = fu.getIter(cX, cY, 10, maxIter);
 				var returnVal = arrCalc[0];
 				return returnVal;
 			}
@@ -332,15 +331,15 @@
 					var hnN, hnW, hnE, hnS; 
 					//alert("Original height of i = " + geometry.vertices[testi].y);
 					for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-						iN = fractutils.getNeighborIndex(i, worldWidth, "N");
-						iW = fractutils.getNeighborIndex(i, worldWidth, "W");
-						iE = fractutils.getNeighborIndex(i, worldWidth, "E");
-						iS = fractutils.getNeighborIndex(i, worldWidth, "S");
+						iN = fu.getNeighborIndex(i, worldWidth, "N");
+						iW = fu.getNeighborIndex(i, worldWidth, "W");
+						iE = fu.getNeighborIndex(i, worldWidth, "E");
+						iS = fu.getNeighborIndex(i, worldWidth, "S");
 						if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
 						if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
 						if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
 						if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
-						erosion = fractutils.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
+						erosion = fu.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
 						geometry.vertices[i].y = erosion[0];
 						iTarget = erosion[1];
 						geometry.vertices[iTarget].y += erosion[2];

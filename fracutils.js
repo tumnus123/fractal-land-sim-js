@@ -96,6 +96,36 @@ function createFracUtils() {
    	  return [n, Tr, Ti];
    	};
 
+   me.fracutils.calcVertexColors = function(geometry) {
+		// calculate vertex colors based on Y (height) values
+		geometry.computeBoundingBox();
+		var yMin = geometry.boundingBox.min.y;
+		var yMax = geometry.boundingBox.max.y;
+		var yRange = yMax - yMin;
+		var color, point, face, numberOfSides, vertexIndex;
+		// faces are indexed using characters
+		var faceIndices = [ 'a', 'b', 'c', 'd' ];
+		// first, assign colors to vertices as desired
+		for ( var i = 0; i < geometry.vertices.length; i++ ) 
+		{
+			point = geometry.vertices[ i ];
+			color = new THREE.Color( 0x0000ff );
+			color.setHSL( 0.7 * (yMax - point.y) / yRange, 0.5, 0.3 );
+			geometry.colors[i] = color; // use this array for convenience
+		}
+		// copy the colors as necessary to the face's vertexColors array.
+		for ( var i = 0; i < geometry.faces.length; i++ ) 
+		{
+			face = geometry.faces[ i ];
+			numberOfSides = ( face instanceof THREE.Face3 ) ? 3 : 4;
+			for( var j = 0; j < numberOfSides; j++ ) 
+			{
+				vertexIndex = face[ faceIndices[ j ] ];
+				face.vertexColors[ j ] = geometry.colors[ vertexIndex ];
+			}
+		}
+		return geometry;
+	};
    
    me.fracutils.erodeHeight = function(i, hi, hnN, hnW, hnE, hnS, iSideSize) {
 		// hi is the height of the current cell, i
