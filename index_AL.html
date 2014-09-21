@@ -87,6 +87,9 @@
 			
 			// How many world units equals one (unmagnified) unit fractal space?
 			var scaleFactor = 2500;
+			
+			var cameraHoverHeight = 50;
+			var timesToGrowLandscape = 0;
 
 			var clock = new THREE.Clock();
 			var fu = createFracUtils();
@@ -223,13 +226,23 @@
 				// 	mesh.geometry.verticesNeedUpdate = true;
 				// }
 				
+				var landscapeNeedsUpdate = false;
+				
 				// reposition the player
-				if (Math.abs(camera.position.x) > 256 || Math.abs(camera.position.z) > 256) {
+				if (Math.abs(camera.position.x) > 25 || Math.abs(camera.position.z) > 25) {
 					resetPosition();
+					timesToGrowLandscape += 50;
+					landscapeNeedsUpdate = false;
+				}
+				
+				// grow landscape if needed
+				if (timesToGrowLandscape > 0) {
+					growLandscape();
+					timesToGrowLandscape--;
 				}
 				
 				// Update the landscape
-				if (false) {
+				if (landscapeNeedsUpdate) {
 					var worldY;
 					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 	
@@ -254,7 +267,6 @@
 				}
 
 				// update the elevation of the camera
-				var cameraHoverHeight = 50;
 				var eVector = new THREE.Vector3(0,-1,0);
 				var eRayCaster = new THREE.Raycaster(camera.position, eVector);
 				var intersects = eRayCaster.intersectObject(mesh);
@@ -266,6 +278,11 @@
 						camera.position.y += (cameraHoverHeight-intersects[0].distance)/2;
 					}
 				}
+
+				var jhStats = document.getElementById("jhStats");
+				jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y + "<br>";// +
+										//	"CamHovHeight: " + intersects[0].distance;
+				
 
 				controls.update( delta );
 				renderer.render( scene, camera );
@@ -280,11 +297,28 @@
 					// when spacing is at maximum, y is eroded height
 				return outGeom;
 			}
+
+			function growLandscape() {
+				// increase distance of each vertex from origin by a small factor
+				
+				var growFactor = 1.001;
+				
+				// var eVector = new THREE.Vector3(0,-1,0);
+				// var eRayCaster = new THREE.Raycaster(camera.position, eVector);
+				// var intersects = eRayCaster.intersectObject(mesh);
+				// var yCorrect = (geometry.vertices[geometry.vertices.length/2].y * 0.01) + (intersects.length * 0.01);
+				
+				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+					geometry.vertices[i].x *= growFactor;
+					geometry.vertices[i].z *= growFactor;
+					geometry.vertices[i].y = (geometry.vertices[i].y * growFactor);
+					//geometry.verticesNeedUpdate = true;
+					mesh.geometry.verticesNeedUpdate = true;
+				}
+				
+			}
 			
 			function resetPosition() {
-				// clone the geometry
-				//var outGeom = inGeom.clone();
-				
 				// freeze the controls
 				controls.freeze = true;
 				
@@ -296,7 +330,7 @@
 				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 					geometry.vertices[i].x -= currXdiff;
 					geometry.vertices[i].z -= currZdiff;
-					geometry.verticesNeedUpdate = true;
+					//geometry.verticesNeedUpdate = true;
 					mesh.geometry.verticesNeedUpdate = true;
 				}
 				
@@ -306,11 +340,6 @@
 				
 				// unfreeze the controls
 				controls.freeze = false;
-				
-				// return the new geometry
-				//return outGeom;
-				
-				
 			}
 			
 			
