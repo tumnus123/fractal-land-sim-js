@@ -229,11 +229,20 @@
 				var landscapeNeedsUpdate = false;
 				
 				// reposition the player
-				if (Math.abs(camera.position.x) > 25 || Math.abs(camera.position.z) > 25) {
-					resetPosition();
-					timesToGrowLandscape += 50;
-					landscapeNeedsUpdate = false;
+				// if (Math.abs(camera.position.x) > 25 || Math.abs(camera.position.z) > 25) {
+				// 	resetPosition();
+				// 	timesToGrowLandscape += 50;
+				// 	landscapeNeedsUpdate = false;
+				// }
+				
+				// shift the landscape
+				if (Math.abs(camera.position.x) >= worldWidth) {
+					shiftAlongAxis('X');
 				}
+				if (Math.abs(camera.position.z) >= worldDepth) {
+					shiftAlongAxis('Z');
+				}
+
 				
 				// grow landscape if needed
 				if (timesToGrowLandscape > 0) {
@@ -296,6 +305,26 @@
 					// when spacing is at minimum, y is half of deltaY of adjacent vertices (0% new Y)
 					// when spacing is at maximum, y is eroded height
 				return outGeom;
+			}
+
+			function shiftAlongAxis(axis) {
+				controls.freeze = true;
+				var deltaCamera;
+				if (axis.toUpperCase()=='X') {
+					deltaCamera = camera.position.x;
+					for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
+						geometry.vertices[i].x = geometry.vertices[i].x - deltaCamera;
+					}
+					camera.position.x = 0;
+				} else {
+					deltaCamera = camera.position.z;
+					for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
+						geometry.vertices[i].z = geometry.vertices[i].z - deltaCamera;
+					}
+					camera.position.z = 0;
+				}
+				controls.freeze = false;
+				mesh.geometry.verticesNeedUpdate = true;
 			}
 
 			function growLandscape() {
