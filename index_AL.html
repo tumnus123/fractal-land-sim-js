@@ -56,376 +56,405 @@
 		<script src="./FirstPersonControls.js"></script>
 
 		<script src="./Detector.js"></script>
+		
+		<script src="//ajax.googleapis.com/ajax/libs/dojo/1.10.1/dojo/dojo.js" data-dojo-config="async: true"></script>
+
 		<!-- script src="./stats.min.js"></script -->
 
 		<script>
+			require(['dojo/_base/array'], function(array) {
 
-			if ( ! Detector.webgl ) {
-
-				Detector.addGetWebGLMessage();
-				document.getElementById( 'container' ).innerHTML = "";
-
-			}
-
-			var container, stats;
-
-			var camera, controls, scene, renderer;
-
-			var mesh, texture, geometry, material;
-			
-			var mag, fcX, fcY, maxIter; // magnification factor, fractal center X, fractal center Y
-
-			// TEST COORDS 01
-			fcX = -0.0438;
-			fcY = 0.97; // 0.9867
-			mag = 54;
-			maxIter = 500;
-				
-			// specify resolution of the world
-			var worldWidth = 256, worldDepth = 256,
-			worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
-			
-			// How many world units equals one (unmagnified) unit fractal space?
-			var scaleFactor = 2500;
-			
-			var cameraHoverHeight = 50;
-			var timesToGrowLandscape = 0;
-
-			var clock = new THREE.Clock();
-			var fu = createFracUtils();
-
-
-			init();
-		   animate();
-
-			function init() {
-				container = document.getElementById( 'container' );
-
-				scene = new THREE.Scene();
-				//scene.fog = new THREE.FogExp2( 0x000000, 0.0007 );
-
-				// LIGHT
-				// var light = new THREE.HemisphereLight(0xffffff,0xffffff,1);
-				// light.position.set(-1300,100,-1300);
-				// scene.add(light);
-
-				// CAMERA
-				camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
-				// camera.position.y = 100;
-				// camera.position.x = -1500;
-				// camera.position.z = -1500;
-				camera.position.set(0,100,0);
-				camera.up = new THREE.Vector3(0,1,0);
-
-				// ACTION :-)
-				controls = new THREE.FirstPersonControls( camera );
-				controls.movementSpeed = 100;
-				controls.lookSpeed = 0.1;
-
-				geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
-				geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
-				geometry.dynamic = true;
-
-				var i, j, il, jl;
-				// var worldX, worldY;
-				// var cX, cY;
-				
-				// alert("v0: x=" + geometry.vertices[10].x + "\n" +
-				//       "    y=" + geometry.vertices[10].y + "\n" + 
-				//       "    z=" + geometry.vertices[10].z);
-
-				var worldY, stretchedY
-				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-
-					//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
-				   //geometry.vertices[i].y = (i-8192)/8;
-				   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
-				   
-				   // log stretch
-				   stretchedY = (Math.log(Math.log(Math.log(worldY))) * 1000) - 500;
-				   geometry.vertices[i].y = stretchedY;
+				if ( ! Detector.webgl ) {
+	
+					Detector.addGetWebGLMessage();
+					document.getElementById( 'container' ).innerHTML = "";
+	
 				}
+	
+				/*******************************************
+				 * IDEAS
+				 * 
+				 * A) Create and maintain a separate array of info re: each pixel; draw from that array
+				 *    to populate/update the actual terrain.  Info to record per pixel:
+				 *    i)   center X in fractal space
+				 *    ii)  center Y in fractal space
+				 *    iii) iters (pre-erosion)
+				 *    iv)  height (post-erosion)
+				 *    
+				 * B) Telescopic view = 2nd camera with narrow/deep field
+				 */
+	
+				var container, stats;
+	
+				var camera, controls, scene, renderer;
+	
+				var mesh, texture, geometry, material;
 				
-				for (var z = 0; z < 7; z++) {
-					erodeLandscape();
-				}
-				
-				//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
-
-				geometry.computeFaceNormals();
-				geometry.computeVertexNormals();
-
-				var vertexColorMaterial  = new THREE.MeshBasicMaterial( { vertexColors: THREE.VertexColors } );
-
-				//color the vertices
-				geometry = fu.calcVertexColors(geometry);
-				
-				mesh = new THREE.Mesh( geometry, vertexColorMaterial );
-				//scene.add( mesh ); // unnecc -- why?
-
-				// "wireframe texture"
-				var wireTexture = new THREE.ImageUtils.loadTexture( './square.png' );
-				wireTexture.wrapS = wireTexture.wrapT = THREE.RepeatWrapping; 
-				wireTexture.repeat.set( 40, 40 );
-
-				var wireMaterial = new THREE.MeshBasicMaterial( { map: wireTexture, vertexColors: THREE.VertexColors } );
-				wireMaterial.map.repeat.set( worldWidth, worldDepth );
-
-				var graphMesh = new THREE.Mesh( geometry, wireMaterial );
-				graphMesh.doubleSided = true;
-				scene.add(graphMesh);
-
-
-				renderer = new THREE.WebGLRenderer();
-				renderer.setClearColor( 0x000000, 1 ); // 0xaaccff
-				renderer.setSize( window.innerWidth, window.innerHeight );
-
-				container.innerHTML = "";
-
-				container.appendChild( renderer.domElement );
-
-			// 	stats = new Stats();
-			// 	stats.domElement.style.position = 'absolute';
-			// 	stats.domElement.style.top = '0px';
-			// 	container.appendChild( stats.domElement );
-
-				window.addEventListener( 'resize', onWindowResize, false );
-
-			}
-
-
-
-			function render() {
-
-				var delta = clock.getDelta(),
-					time = clock.getElapsedTime() * 10;
-				
-				var needToUpdate = false;
-				
-				//var middleVertexIndex = geometry.vertices.length/2;
-				
-				var jhStats = document.getElementById("jhStats");
-				jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y;
-				
-				// if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
-				// 	 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
-					//
-					// modify the vertices in some fashion here
-					// 
-					// var centerX = geometry.vertices[middleVertexIndex].x;
-					// var centerZ = geometry.vertices[middleVertexIndex].z;
-					// for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					// 	// move each vertex 0.1% further from the center
-					// 	deltaX = geometry.vertices[i].x - centerX;
-					// 	deltaZ = geometry.vertices[i].z - centerZ;
-					// 	geometry.vertices[i].x += (deltaX*0.001);
-					// 	geometry.vertices[i].z += (deltaZ*0.001);
-						
-					// }
+				var mag, fcX, fcY, maxIter; // magnification factor, fractal center X, fractal center Y
+	
+				// TEST COORDS 01
+				fcX = -0.0438;
+				fcY = 0.97; // 0.9867
+				mag = 54;
+				maxIter = 500;
 					
-				// 	mesh.geometry.verticesNeedUpdate = true;
-				// }
+				// specify resolution of the world
+				var worldWidth = 256, worldDepth = 256,
+				worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
 				
-				var landscapeNeedsUpdate = false;
+				// How many world units equals one (unmagnified) unit fractal space?
+				var scaleFactor = 2500;
 				
-				// reposition the player
-				// if (Math.abs(camera.position.x) > 25 || Math.abs(camera.position.z) > 25) {
-				// 	resetPosition();
-				// 	timesToGrowLandscape += 50;
-				// 	landscapeNeedsUpdate = false;
-				// }
-				
-				// shift the landscape
-				if (Math.abs(camera.position.x) >= worldWidth) {
-					shiftAlongAxis('X');
-				}
-				if (Math.abs(camera.position.z) >= worldDepth) {
-					shiftAlongAxis('Z');
-				}
+				var cameraHoverHeight = 50;
+				var timesToGrowLandscape = 0;
+	
+				var clock = new THREE.Clock();
 
-				
-				// grow landscape if needed
-				if (timesToGrowLandscape > 0) {
-					growLandscape();
-					timesToGrowLandscape--;
+				var fu = createFracUtils();
+				var arrFrac = createFracArray(worldWidth*3);	
+	
+				initFracArray();
+				init();
+			   animate();
+	
+				function createFracArray(rows) {
+					var arr = [];
+					for (var i = 0; i < rows; i++) {
+						arr[i] = [];
+					}
+					return arr;					
 				}
 				
-				// Update the landscape
-				if (landscapeNeedsUpdate) {
-					var worldY;
+				function initFracArray() {
+					// Create a 2D array that's 3x the dims of the world
+					
+				}
+	
+				function init() {
+					container = document.getElementById( 'container' );
+	
+					scene = new THREE.Scene();
+					//scene.fog = new THREE.FogExp2( 0x000000, 0.0007 );
+	
+					// LIGHT
+					// var light = new THREE.HemisphereLight(0xffffff,0xffffff,1);
+					// light.position.set(-1300,100,-1300);
+					// scene.add(light);
+	
+					// CAMERA
+					camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
+					camera.position.set(0,100,0);
+					camera.up = new THREE.Vector3(0,1,0);
+	
+					// ACTION :-)
+					controls = new THREE.FirstPersonControls( camera );
+					controls.movementSpeed = 100;
+					controls.lookSpeed = 0.1;
+	
+					geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
+					geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
+					geometry.dynamic = true;
+	
+					var i, j, il, jl;
+					// var worldX, worldY;
+					// var cX, cY;
+					
+					// alert("v0: x=" + geometry.vertices[10].x + "\n" +
+					//       "    y=" + geometry.vertices[10].y + "\n" + 
+					//       "    z=" + geometry.vertices[10].z);
+	
+					var worldY, stretchedY
 					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 	
 						//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
 					   //geometry.vertices[i].y = (i-8192)/8;
 					   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
-					   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
-					   geometry.vertices[i].y = worldY;
+					   
+					   // log stretch
+					   stretchedY = (Math.log(Math.log(Math.log(worldY))) * 1000) - 500;
+					   geometry.vertices[i].y = stretchedY;
 					}
 					
-					for (var z = 0; z < 2; z++) {
+					for (var z = 0; z < 7; z++) {
 						erodeLandscape();
 					}
-		
-					//geometry.computeFaceNormals();
-					//geometry.computeVertexNormals();
+					
+					//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
 	
-					mesh.geometry.verticesNeedUpdate = true;
-					//mesh.geometry.normalsNeedUpdate = true;
-				} else {
-					geometry = geometry;
+					geometry.computeFaceNormals();
+					geometry.computeVertexNormals();
+	
+					var vertexColorMaterial  = new THREE.MeshBasicMaterial( { vertexColors: THREE.VertexColors } );
+	
+					//color the vertices
+					geometry = fu.calcVertexColors(geometry);
+					
+					mesh = new THREE.Mesh( geometry, vertexColorMaterial );
+					//scene.add( mesh ); // unnecc -- why?
+	
+					// "wireframe texture"
+					var wireTexture = new THREE.ImageUtils.loadTexture( './square.png' );
+					wireTexture.wrapS = wireTexture.wrapT = THREE.RepeatWrapping; 
+					wireTexture.repeat.set( 40, 40 );
+	
+					var wireMaterial = new THREE.MeshBasicMaterial( { map: wireTexture, vertexColors: THREE.VertexColors } );
+					wireMaterial.map.repeat.set( worldWidth, worldDepth );
+	
+					var graphMesh = new THREE.Mesh( geometry, wireMaterial );
+					graphMesh.doubleSided = true;
+					scene.add(graphMesh);
+	
+	
+					renderer = new THREE.WebGLRenderer();
+					renderer.setClearColor( 0x000000, 1 ); // 0xaaccff
+					renderer.setSize( window.innerWidth, window.innerHeight );
+	
+					container.innerHTML = "";
+	
+					container.appendChild( renderer.domElement );
+	
+				// 	stats = new Stats();
+				// 	stats.domElement.style.position = 'absolute';
+				// 	stats.domElement.style.top = '0px';
+				// 	container.appendChild( stats.domElement );
+	
+					window.addEventListener( 'resize', onWindowResize, false );
+	
 				}
-
-				// update the elevation of the camera
-				var eVector = new THREE.Vector3(0,-1,0);
-				var eRayCaster = new THREE.Raycaster(camera.position, eVector);
-				var intersects = eRayCaster.intersectObject(mesh);
-				if (intersects.length > 0) {
-					if (intersects[0].distance > cameraHoverHeight) {
-						camera.position.y -= (intersects[0].distance-cameraHoverHeight)/2;
+	
+	
+	
+				function render() {
+	
+					var delta = clock.getDelta(),
+						time = clock.getElapsedTime() * 10;
+					
+					var needToUpdate = false;
+					
+					//var middleVertexIndex = geometry.vertices.length/2;
+					
+					var jhStats = document.getElementById("jhStats");
+					jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y;
+					
+					// if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
+					// 	 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
+						//
+						// modify the vertices in some fashion here
+						// 
+						// var centerX = geometry.vertices[middleVertexIndex].x;
+						// var centerZ = geometry.vertices[middleVertexIndex].z;
+						// for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+						// 	// move each vertex 0.1% further from the center
+						// 	deltaX = geometry.vertices[i].x - centerX;
+						// 	deltaZ = geometry.vertices[i].z - centerZ;
+						// 	geometry.vertices[i].x += (deltaX*0.001);
+						// 	geometry.vertices[i].z += (deltaZ*0.001);
+							
+						// }
+						
+					// 	mesh.geometry.verticesNeedUpdate = true;
+					// }
+					
+					var landscapeNeedsUpdate = false;
+					
+					// reposition the player
+					// if (Math.abs(camera.position.x) > 25 || Math.abs(camera.position.z) > 25) {
+					// 	resetPosition();
+					// 	timesToGrowLandscape += 50;
+					// 	landscapeNeedsUpdate = false;
+					// }
+					
+					// shift the landscape
+					if (Math.abs(camera.position.x) >= worldWidth) {
+						shiftAlongAxis('X');
 					}
-					if (intersects[0].distance < cameraHoverHeight) {
-						camera.position.y += (cameraHoverHeight-intersects[0].distance)/2;
+					if (Math.abs(camera.position.z) >= worldDepth) {
+						shiftAlongAxis('Z');
 					}
-				}
-
-				var jhStats = document.getElementById("jhStats");
-				jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y + "<br>";// +
-										//	"CamHovHeight: " + intersects[0].distance;
-				
-
-				controls.update( delta );
-				renderer.render( scene, camera );
-
-			}
+	
+					
+					// grow landscape if needed
+					if (timesToGrowLandscape > 0) {
+						growLandscape();
+						timesToGrowLandscape--;
+					}
+					
+					// Update the landscape
+					if (landscapeNeedsUpdate) {
+						var worldY;
+						for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+		
+							//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
+						   //geometry.vertices[i].y = (i-8192)/8;
+						   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+						   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
+						   geometry.vertices[i].y = worldY;
+						}
+						
+						for (var z = 0; z < 2; z++) {
+							erodeLandscape();
+						}
 			
-			function densifyWorld(inGeom) {
-				// create a new geometry that's twice as dense as the input
-				// set the xyz of existing vertices
-				// set the xyz of new vertices
-					// when spacing is at minimum, y is half of deltaY of adjacent vertices (0% new Y)
-					// when spacing is at maximum, y is eroded height
-				return outGeom;
-			}
-
-			function shiftAlongAxis(axis) {
-				controls.freeze = true;
-				var deltaCamera;
-				if (axis.toUpperCase()=='X') {
-					deltaCamera = camera.position.x;
-					for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
-						geometry.vertices[i].x = geometry.vertices[i].x - deltaCamera;
+						//geometry.computeFaceNormals();
+						//geometry.computeVertexNormals();
+		
+						mesh.geometry.verticesNeedUpdate = true;
+						//mesh.geometry.normalsNeedUpdate = true;
+					} else {
+						geometry = geometry;
 					}
+	
+					// update the elevation of the camera
+					var eVector = new THREE.Vector3(0,-1,0);
+					var eRayCaster = new THREE.Raycaster(camera.position, eVector);
+					var intersects = eRayCaster.intersectObject(mesh);
+					if (intersects.length > 0) {
+						if (intersects[0].distance > cameraHoverHeight) {
+							camera.position.y -= (intersects[0].distance-cameraHoverHeight)/2;
+						}
+						if (intersects[0].distance < cameraHoverHeight) {
+							camera.position.y += (cameraHoverHeight-intersects[0].distance)/2;
+						}
+					}
+	
+					var jhStats = document.getElementById("jhStats");
+					jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y + "<br>";// +
+											//	"CamHovHeight: " + intersects[0].distance;
+					
+	
+					controls.update( delta );
+					renderer.render( scene, camera );
+	
+				}
+				
+				function densifyWorld(inGeom) {
+					// create a new geometry that's twice as dense as the input
+					// set the xyz of existing vertices
+					// set the xyz of new vertices
+						// when spacing is at minimum, y is half of deltaY of adjacent vertices (0% new Y)
+						// when spacing is at maximum, y is eroded height
+					return outGeom;
+				}
+	
+				function shiftAlongAxis(axis) {
+					controls.freeze = true;
+					var deltaCamera;
+					if (axis.toUpperCase()=='X') {
+						deltaCamera = camera.position.x;
+						for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
+							geometry.vertices[i].x = geometry.vertices[i].x - deltaCamera;
+						}
+						camera.position.x = 0;
+					} else {
+						deltaCamera = camera.position.z;
+						for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
+							geometry.vertices[i].z = geometry.vertices[i].z - deltaCamera;
+						}
+						camera.position.z = 0;
+					}
+					controls.freeze = false;
+					mesh.geometry.verticesNeedUpdate = true;
+				}
+	
+				function growLandscape() {
+					// increase distance of each vertex from origin by a small factor
+					
+					var growFactor = 1.001;
+					
+					// var eVector = new THREE.Vector3(0,-1,0);
+					// var eRayCaster = new THREE.Raycaster(camera.position, eVector);
+					// var intersects = eRayCaster.intersectObject(mesh);
+					// var yCorrect = (geometry.vertices[geometry.vertices.length/2].y * 0.01) + (intersects.length * 0.01);
+					
+					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+						geometry.vertices[i].x *= growFactor;
+						geometry.vertices[i].z *= growFactor;
+						geometry.vertices[i].y = (geometry.vertices[i].y * growFactor);
+						//geometry.verticesNeedUpdate = true;
+						mesh.geometry.verticesNeedUpdate = true;
+					}
+					
+				}
+				
+				function resetPosition() {
+					// freeze the controls
+					controls.freeze = true;
+					
+					// capture the current X and Z diffs
+					var currXdiff = camera.position.x;
+					var currZdiff = camera.position.z;
+					
+					// apply diffs to each vertex
+					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+						geometry.vertices[i].x -= currXdiff;
+						geometry.vertices[i].z -= currZdiff;
+						//geometry.verticesNeedUpdate = true;
+						mesh.geometry.verticesNeedUpdate = true;
+					}
+					
+					// reposition the camera at 0,0
 					camera.position.x = 0;
-				} else {
-					deltaCamera = camera.position.z;
-					for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
-						geometry.vertices[i].z = geometry.vertices[i].z - deltaCamera;
-					}
 					camera.position.z = 0;
-				}
-				controls.freeze = false;
-				mesh.geometry.verticesNeedUpdate = true;
-			}
-
-			function growLandscape() {
-				// increase distance of each vertex from origin by a small factor
-				
-				var growFactor = 1.001;
-				
-				// var eVector = new THREE.Vector3(0,-1,0);
-				// var eRayCaster = new THREE.Raycaster(camera.position, eVector);
-				// var intersects = eRayCaster.intersectObject(mesh);
-				// var yCorrect = (geometry.vertices[geometry.vertices.length/2].y * 0.01) + (intersects.length * 0.01);
-				
-				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					geometry.vertices[i].x *= growFactor;
-					geometry.vertices[i].z *= growFactor;
-					geometry.vertices[i].y = (geometry.vertices[i].y * growFactor);
-					//geometry.verticesNeedUpdate = true;
-					mesh.geometry.verticesNeedUpdate = true;
+					
+					// unfreeze the controls
+					controls.freeze = false;
 				}
 				
-			}
-			
-			function resetPosition() {
-				// freeze the controls
-				controls.freeze = true;
 				
-				// capture the current X and Z diffs
-				var currXdiff = camera.position.x;
-				var currZdiff = camera.position.z;
-				
-				// apply diffs to each vertex
-				for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					geometry.vertices[i].x -= currXdiff;
-					geometry.vertices[i].z -= currZdiff;
-					//geometry.verticesNeedUpdate = true;
-					mesh.geometry.verticesNeedUpdate = true;
+	
+				function calcWorldY(worldX, worldZ) {
+					var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
+					var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
+					var arrCalc = fu.getIter(cX, cY, 10, maxIter);
+					var returnVal = arrCalc[0];
+					return returnVal;
 				}
 				
-				// reposition the camera at 0,0
-				camera.position.x = 0;
-				camera.position.z = 0;
-				
-				// unfreeze the controls
-				controls.freeze = false;
-			}
-			
-			
-
-			function calcWorldY(worldX, worldZ) {
-				var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
-				var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
-				var arrCalc = fu.getIter(cX, cY, 10, maxIter);
-				var returnVal = arrCalc[0];
-				return returnVal;
-			}
-			
-			function erodeLandscape() {
-					// erode the landscape
-					var erosion = [];
-					var iTarget; // verext to which erosion will flow
-					var iN, iW, iE, iS;
-					var hnN, hnW, hnE, hnS; 
-					//alert("Original height of i = " + geometry.vertices[testi].y);
-					for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-						iN = fu.getNeighborIndex(i, worldWidth, "N");
-						iW = fu.getNeighborIndex(i, worldWidth, "W");
-						iE = fu.getNeighborIndex(i, worldWidth, "E");
-						iS = fu.getNeighborIndex(i, worldWidth, "S");
-						if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
-						if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
-						if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
-						if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
-						erosion = fu.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
-						geometry.vertices[i].y = erosion[0];
-						iTarget = erosion[1];
-						geometry.vertices[iTarget].y += erosion[2];
+				function erodeLandscape() {
+						// erode the landscape
+						var erosion = [];
+						var iTarget; // verext to which erosion will flow
+						var iN, iW, iE, iS;
+						var hnN, hnW, hnE, hnS; 
+						//alert("Original height of i = " + geometry.vertices[testi].y);
+						for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+							iN = fu.getNeighborIndex(i, worldWidth, "N");
+							iW = fu.getNeighborIndex(i, worldWidth, "W");
+							iE = fu.getNeighborIndex(i, worldWidth, "E");
+							iS = fu.getNeighborIndex(i, worldWidth, "S");
+							if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
+							if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
+							if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
+							if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
+							erosion = fu.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
+							geometry.vertices[i].y = erosion[0];
+							iTarget = erosion[1];
+							geometry.vertices[iTarget].y += erosion[2];
+						}
+						//alert("New height of vertex[" + testi + "] = " + geometry.vertices[testi].y);
+	
 					}
-					//alert("New height of vertex[" + testi + "] = " + geometry.vertices[testi].y);
-
+	
+				function onWindowResize() {
+	
+					camera.aspect = window.innerWidth / window.innerHeight;
+					camera.updateProjectionMatrix();
+	
+					renderer.setSize( window.innerWidth, window.innerHeight );
+	
+					controls.handleResize();
+	
 				}
-
-			function onWindowResize() {
-
-				camera.aspect = window.innerWidth / window.innerHeight;
-				camera.updateProjectionMatrix();
-
-				renderer.setSize( window.innerWidth, window.innerHeight );
-
-				controls.handleResize();
-
-			}
-
-			function animate() {
-
-				requestAnimationFrame( animate );
-
-				render();
-				//stats.update();
-
-			}
-
+	
+				function animate() {
+	
+					requestAnimationFrame( animate );
+	
+					render();
+					//stats.update();
+	
+				}
+			});
 		</script>
 
 	</body>
