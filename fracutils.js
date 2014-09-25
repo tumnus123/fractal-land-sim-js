@@ -202,6 +202,83 @@ function createFracUtils() {
 		return arrReturn;
 	};
    
+   me.fracutils.erodeHeight2 = function(sourceXi, sourceYi, sourceHeight, hnN, hnW, hnE, hnS, iSideSize) {
+		// sourceHeight is the height of the current cell, fa[sourceXi][sourceYi]
+		// hnX is the height of the neightbor to the X direction
+		var maxHeightDiff = 0;
+		var testHeightDiff;
+		var neighbor = "";
+		var tallShort = "";
+		
+		var talusAngle = 5; // 4/width of map
+		
+		if (hnN!=null) {
+			testHeightDiff = sourceHeight - hnN;
+			if (testHeightDiff > maxHeightDiff) {
+				maxHeightDiff = testHeightDiff;
+				neighbor = "hnN";
+				if (sourceHeight > hnN) {tallShort = "taller";} else {tallShort = "shorter";}
+			}
+		}
+		if (hnW!=null) {
+			testHeightDiff = sourceHeight - hnW;
+			if (testHeightDiff > maxHeightDiff) {
+				maxHeightDiff = testHeightDiff;
+				neighbor = "hnW";
+				if (sourceHeight > hnW) {tallShort = "taller";} else {tallShort = "shorter";}
+			}
+		}
+		if (hnE!=null) {
+			testHeightDiff = sourceHeight - hnE;
+			if (testHeightDiff > maxHeightDiff) {
+				maxHeightDiff = testHeightDiff;
+				neighbor = "hnE";
+				if (sourceHeight > hnE) {tallShort = "taller";} else {tallShort = "shorter";}
+			}
+		}
+		if (hnS!=null) {
+			testHeightDiff = sourceHeight - hnS;
+			if (testHeightDiff > maxHeightDiff) {
+				maxHeightDiff = testHeightDiff;
+				neighbor = "hnS";
+				if (sourceHeight > hnS) {tallShort = "taller";} else {tallShort = "shorter";}
+			}
+		}
+		// calculate slope
+		var slope = maxHeightDiff; // assumes "run" is 1.0
+		
+		// if slope exceeds talus angle, erode
+		var deltaHeight = 0;
+		var targetXi = sourceXi;
+		var targetYi = sourceYi;
+		if (slope > talusAngle) {
+			// erosion factor
+			deltaHeight = maxHeightDiff / 2;
+			
+			// determine which index the eroded material flows to
+			if (neighbor=="hnW") { targetXi -= 1; }
+			if (neighbor=="hnE") { targetXi += 1; }
+			if (neighbor=="hnN") { targetYi -= 1; }
+			if (neighbor=="hnS") { targetYi += 1; }
+			
+			// perform the erosion
+			if (tallShort=="taller") {
+				sourceHeight -= deltaHeight;
+			} else {
+				sourceHeight += deltaHeight;
+				deltaHeight *= -1;
+			}
+		}
+		
+		var arrReturn = [];
+		arrReturn.push(sourceHeight);
+		arrReturn.push(targetXi);
+		arrReturn.push(targetYi);
+		arrReturn.push(deltaHeight);
+		
+		return arrReturn;
+	};
+   
    me.fracutils.getNeighborIndex = function(i, iSideSize, strDirection) {
 		// Assumes (0,0) is in NW corner.
 		// Returns null if no neighbor in the specified direction

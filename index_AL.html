@@ -110,10 +110,11 @@
 	
 				var clock = new THREE.Clock();
 
-				var fu = createFracUtils();
-				var arrFrac = createFracArray(worldWidth*3);	
+				var fracUtils = createFracUtils();
+				var fracArray = createFracArray((worldWidth-1)*3); // guarantees there's a "middle"	
 	
-				initFracArray();
+				fracArray = initFracArray(fracArray, fcX, fcY, mag, maxIter, worldWidth);
+				
 				init();
 			   animate();
 	
@@ -125,11 +126,57 @@
 					return arr;					
 				}
 				
-				function initFracArray() {
-					// Create a 2D array that's 3x the dims of the world
+				function initFracArray(fa, fracCtrX, fracCtrY, fracMag, fracMaxIter, fracRez) {
+					// determine the size of the array
+					var faLength = fa.length;
+					var faHalfLength = faLength / 2;
+					
+					// determine the min fractal X and Y and increment, based on center and mag
+					// (assume that at 1x, min/max are all 1.0 out on their respective axes)
+					var radius = 1 / fracMag;
+					var incr = radius / (fracRez / 2);
+					
+					//alert("incr: " + incr);
+					
+					// loop through and populate each position in fracArray with an array containing pieces of info:
+					var pixelX; 		//  [0] center X of "pixel" in fractal space
+				 	var pixelY; 		//  [1] center Y of "pixel" in fractal space
+				 	var valRaw; 		//  [2] raw calc'd iter value
+				 	var valProcessed; //  [3] stretched and eroded iter value
+					for (var i = 0; i < faLength; i++) {
+						for (var j = 0; j < faLength; j++) {
+							fa[i][j] = [];
+							pixelX = fracCtrX - (incr * (i - faHalfLength)); 
+							pixelY = fracCtrY - (incr * (j - faHalfLength)); 
+							valRaw = calcRawIter(pixelX,pixelY);
+							valProcessed = (Math.log(Math.log(Math.log(valRaw))) * 1000) - 500;
+							fa[i][j] = [pixelX, pixelY, valRaw, valProcessed];
+						}
+					}
+					
+					//alert("fa[0][0][0]: " + fa[0][0][0]);
+					
+					// erode the stretched iter values
+					var erosion = [];
+					var hnN, hnW, hnE, hnS;
+					for (var z = 0; z < 7; z++) { // apply erosion this many times
+						for (i = 0; i < faLength; i++) {
+							for (j = 0; j < faLength; j++) {
+								if (i==0) {hnN = null} else {hnN = fa[i-1][j][3]}
+								if (i==faLength-1) {hnS = null} else {hnS = fa[i+1][j][3]}
+								if (j==0) {hnW = null} else {hnW = fa[i][j-1][3]}
+								if (j==faLength-1) {hnE = null} else {hnE = fa[i][j+1][3]}
+								erosion = fracUtils.erodeHeight2(i, j, fa[i][j][3], hnN, hnW, hnE, hnS, faLength); 
+								fa[i][j][3] = erosion[0];
+								fa[erosion[1]][erosion[2]][3] += erosion[3];
+							}
+						}
+					}
+					
+					return fa;
 					
 				}
-	
+
 				function init() {
 					container = document.getElementById( 'container' );
 	
@@ -163,21 +210,36 @@
 					//       "    y=" + geometry.vertices[10].y + "\n" + 
 					//       "    z=" + geometry.vertices[10].z);
 	
-					var worldY, stretchedY
-					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-	
-						//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
-					   //geometry.vertices[i].y = (i-8192)/8;
-					   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
-					   
-					   // log stretch
-					   stretchedY = (Math.log(Math.log(Math.log(worldY))) * 1000) - 500;
-					   geometry.vertices[i].y = stretchedY;
-					}
+					// var worldY, stretchedY
 					
-					for (var z = 0; z < 7; z++) {
-						erodeLandscape();
+					var iX, iY;
+					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
+						/*
+						 * === old algorithm ===	
+						 */
+					   // worldY = calcRawIter(geometry.vertices[i].x,geometry.vertices[i].z);
+					   // stretchedY = (Math.log(Math.log(Math.log(worldY))) * 1000) - 500;
+					   // geometry.vertices[i].y = stretchedY;
+					   
+					   /*
+					    * === new approach using fracArray
+					    */
+					   
+					   // get the appropriate value from the appropriate location in the fracArray; e.g. if worldWidth, worldDepth both = 4:
+					   //   When i==0, get fracArray[worldWidth-1][worldDepth-1]
+					   //   When i==2, get fracArray[worldWidth-1+i][worldDepth-1]
+					   //   When i==4, get fracArray[worldWidth-1+(i%worldWidth)][worldDepth-1+(Math.floor(i/4))]
+					   iX = worldWidth - 1 + (i % worldWidth); // TODO: Debug this...
+					   iY = worldDepth - 1 + (Math.floor(i / worldDepth));
+					   geometry.vertices[i].y = fracArray[iX][iY][3];
 					}
+
+					/*
+					 * === old algorithm ===	
+					 */
+					// for (var z = 0; z < 7; z++) {
+					// 	erodeLandscape();
+					// }
 					
 					//console.log( "triangles: " + geometry.faces.length * 2 + " faces: " + geometry.faces.length + " vertices: " + geometry.vertices.length );
 	
@@ -187,7 +249,7 @@
 					var vertexColorMaterial  = new THREE.MeshBasicMaterial( { vertexColors: THREE.VertexColors } );
 	
 					//color the vertices
-					geometry = fu.calcVertexColors(geometry);
+					geometry = fracUtils.calcVertexColors(geometry);
 					
 					mesh = new THREE.Mesh( geometry, vertexColorMaterial );
 					//scene.add( mesh ); // unnecc -- why?
@@ -221,8 +283,6 @@
 					window.addEventListener( 'resize', onWindowResize, false );
 	
 				}
-	
-	
 	
 				function render() {
 	
@@ -286,7 +346,7 @@
 		
 							//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
 						   //geometry.vertices[i].y = (i-8192)/8;
-						   worldY = calcWorldY(geometry.vertices[i].x,geometry.vertices[i].z);
+						   worldY = calcRawIter(geometry.vertices[i].x,geometry.vertices[i].z);
 						   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
 						   geometry.vertices[i].y = worldY;
 						}
@@ -402,13 +462,15 @@
 				
 				
 	
-				function calcWorldY(worldX, worldZ) {
+				function calcRawIter(worldX, worldZ) {
 					var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
 					var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
-					var arrCalc = fu.getIter(cX, cY, 10, maxIter);
+					var arrCalc = fracUtils.getIter(cX, cY, 10, maxIter);
 					var returnVal = arrCalc[0];
 					return returnVal;
 				}
+				
+
 				
 				function erodeLandscape() {
 						// erode the landscape
@@ -418,15 +480,15 @@
 						var hnN, hnW, hnE, hnS; 
 						//alert("Original height of i = " + geometry.vertices[testi].y);
 						for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-							iN = fu.getNeighborIndex(i, worldWidth, "N");
-							iW = fu.getNeighborIndex(i, worldWidth, "W");
-							iE = fu.getNeighborIndex(i, worldWidth, "E");
-							iS = fu.getNeighborIndex(i, worldWidth, "S");
+							iN = fracUtils.getNeighborIndex(i, worldWidth, "N");
+							iW = fracUtils.getNeighborIndex(i, worldWidth, "W");
+							iE = fracUtils.getNeighborIndex(i, worldWidth, "E");
+							iS = fracUtils.getNeighborIndex(i, worldWidth, "S");
 							if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
 							if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
 							if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
 							if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
-							erosion = fu.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
+							erosion = fracUtils.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
 							geometry.vertices[i].y = erosion[0];
 							iTarget = erosion[1];
 							geometry.vertices[iTarget].y += erosion[2];
