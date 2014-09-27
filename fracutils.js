@@ -127,83 +127,83 @@ function createFracUtils() {
 		return geometry;
 	};
    
-   me.fracutils.erodeHeight = function(i, hi, hnN, hnW, hnE, hnS, iSideSize) {
-		// hi is the height of the current cell, i
-		// hnX is the height of the neightbor to the X direction
-		var maxHeightDiff = 0;
-		var testHeightDiff;
-		var neighbor = "";
-		var tallShort = "";
+ //  me.fracutils.erodeHeight = function(i, hi, hnN, hnW, hnE, hnS, iSideSize) {
+	// 	// hi is the height of the current cell, i
+	// 	// hnX is the height of the neightbor to the X direction
+	// 	var maxHeightDiff = 0;
+	// 	var testHeightDiff;
+	// 	var neighbor = "";
+	// 	var tallShort = "";
 		
-		var talusAngle = 5; // 4/width of map
+	// 	var talusAngle = 5; // 4/width of map
 		
-		if (hnN!=null) {
-			testHeightDiff = hi - hnN;
-			if (testHeightDiff > maxHeightDiff) {
-				maxHeightDiff = testHeightDiff;
-				neighbor = "hnN";
-				if (hi > hnN) {tallShort = "taller";} else {tallShort = "shorter";}
-			}
-		}
-		if (hnW!=null) {
-			testHeightDiff = hi - hnW;
-			if (testHeightDiff > maxHeightDiff) {
-				maxHeightDiff = testHeightDiff;
-				neighbor = "hnW";
-				if (hi > hnW) {tallShort = "taller";} else {tallShort = "shorter";}
-			}
-		}
-		if (hnE!=null) {
-			testHeightDiff = hi - hnE;
-			if (testHeightDiff > maxHeightDiff) {
-				maxHeightDiff = testHeightDiff;
-				neighbor = "hnE";
-				if (hi > hnE) {tallShort = "taller";} else {tallShort = "shorter";}
-			}
-		}
-		if (hnS!=null) {
-			testHeightDiff = hi - hnS;
-			if (testHeightDiff > maxHeightDiff) {
-				maxHeightDiff = testHeightDiff;
-				neighbor = "hnS";
-				if (hi > hnS) {tallShort = "taller";} else {tallShort = "shorter";}
-			}
-		}
-		// calculate slope
-		var slope = maxHeightDiff; // assumes "run" is 1.0
+	// 	if (hnN!=null) {
+	// 		testHeightDiff = hi - hnN;
+	// 		if (testHeightDiff > maxHeightDiff) {
+	// 			maxHeightDiff = testHeightDiff;
+	// 			neighbor = "hnN";
+	// 			if (hi > hnN) {tallShort = "taller";} else {tallShort = "shorter";}
+	// 		}
+	// 	}
+	// 	if (hnW!=null) {
+	// 		testHeightDiff = hi - hnW;
+	// 		if (testHeightDiff > maxHeightDiff) {
+	// 			maxHeightDiff = testHeightDiff;
+	// 			neighbor = "hnW";
+	// 			if (hi > hnW) {tallShort = "taller";} else {tallShort = "shorter";}
+	// 		}
+	// 	}
+	// 	if (hnE!=null) {
+	// 		testHeightDiff = hi - hnE;
+	// 		if (testHeightDiff > maxHeightDiff) {
+	// 			maxHeightDiff = testHeightDiff;
+	// 			neighbor = "hnE";
+	// 			if (hi > hnE) {tallShort = "taller";} else {tallShort = "shorter";}
+	// 		}
+	// 	}
+	// 	if (hnS!=null) {
+	// 		testHeightDiff = hi - hnS;
+	// 		if (testHeightDiff > maxHeightDiff) {
+	// 			maxHeightDiff = testHeightDiff;
+	// 			neighbor = "hnS";
+	// 			if (hi > hnS) {tallShort = "taller";} else {tallShort = "shorter";}
+	// 		}
+	// 	}
+	// 	// calculate slope
+	// 	var slope = maxHeightDiff; // assumes "run" is 1.0
 		
-		// if slope exceeds talus angle, erode
-		var deltaHeight = 0;
-		var iTarget = i;				
-		if (slope > talusAngle) {
-			// erosion factor
-			deltaHeight = maxHeightDiff / 2;
+	// 	// if slope exceeds talus angle, erode
+	// 	var deltaHeight = 0;
+	// 	var iTarget = i;				
+	// 	if (slope > talusAngle) {
+	// 		// erosion factor
+	// 		deltaHeight = maxHeightDiff / 2;
 			
-			// determine which index the eroded material flows to
-			if (neighbor=="hnW") { iTarget -= 1; }
-			if (neighbor=="hnE") { iTarget += 1; }
-			if (neighbor=="hnN") { iTarget -= iSideSize; }
-			if (neighbor=="hnS") { iTarget += iSideSize; }
+	// 		// determine which index the eroded material flows to
+	// 		if (neighbor=="hnW") { iTarget -= 1; }
+	// 		if (neighbor=="hnE") { iTarget += 1; }
+	// 		if (neighbor=="hnN") { iTarget -= iSideSize; }
+	// 		if (neighbor=="hnS") { iTarget += iSideSize; }
 			
-			// perform the erosion
-			if (tallShort=="taller") {
-				hi -= deltaHeight;
-			} else {
-				hi += deltaHeight;
-				deltaHeight *= -1;
-			}
-		}
+	// 		// perform the erosion
+	// 		if (tallShort=="taller") {
+	// 			hi -= deltaHeight;
+	// 		} else {
+	// 			hi += deltaHeight;
+	// 			deltaHeight *= -1;
+	// 		}
+	// 	}
 		
-		var arrReturn = [];
-		arrReturn.push(hi);
-		arrReturn.push(iTarget);
-		arrReturn.push(deltaHeight);
+	// 	var arrReturn = [];
+	// 	arrReturn.push(hi);
+	// 	arrReturn.push(iTarget);
+	// 	arrReturn.push(deltaHeight);
 		
-		return arrReturn;
-	};
+	// 	return arrReturn;
+	// };
    
-   me.fracutils.erodeHeight2 = function(sourceXi, sourceYi, sourceHeight, hnN, hnW, hnE, hnS, iSideSize) {
-		// sourceHeight is the height of the current cell, fa[sourceXi][sourceYi]
+   me.fracutils.erodeHeight2 = function(sourceYi, sourceXi, sourceHeight, hnN, hnW, hnE, hnS, iSideSize) {
+		// sourceHeight is the height of the current cell, fa[sourceYi][sourceXi]
 		// hnX is the height of the neightbor to the X direction
 		var maxHeightDiff = 0;
 		var testHeightDiff;
@@ -272,14 +272,15 @@ function createFracUtils() {
 		
 		var arrReturn = [];
 		arrReturn.push(sourceHeight);
-		arrReturn.push(targetXi);
 		arrReturn.push(targetYi);
+		arrReturn.push(targetXi);
 		arrReturn.push(deltaHeight);
 		
 		return arrReturn;
 	};
    
    me.fracutils.getNeighborIndex = function(i, iSideSize, strDirection) {
+		// Works with 1D array.
 		// Assumes (0,0) is in NW corner.
 		// Returns null if no neighbor in the specified direction
 		
