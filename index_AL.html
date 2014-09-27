@@ -94,16 +94,22 @@
 	
 				// TEST COORDS 01
 				fcX = -0.0438;
-				fcY = 0.9867; // 0.9867
+				fcY = 0.9867; 
 				mag = 54;
 				maxIter = 500;
+
+				// fcX = 0;
+				// fcY = 0.5; 
+				// mag = 1;
+				// maxIter = 150;
+
 					
 				// specify resolution of the world
 				var worldWidth = 256, worldDepth = 256,
 				worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
 				
 				// How many world units equals one (unmagnified) unit fractal space?
-				var scaleFactor = 2500;
+				// var scaleFactor = 500; // UNUSED
 				
 				var cameraHoverHeight = 50;
 				var timesToGrowLandscape = 0;
@@ -111,7 +117,13 @@
 				var clock = new THREE.Clock();
 
 				var fracUtils = createFracUtils();
-				var fracArray = createFracArray((worldWidth-1)*3); // guarantees there's a "middle"	
+				// FRACARRAY - an array of arrays of arrays 
+				// Holds pre-calc'd heights and other values separate from PlaneGeometry.
+				// fracArray[posY][posX][ fX, fY, raw, processed ]
+				var fracArray = createFracArray((worldWidth-1)*3); 	
+				var faLength = (worldWidth-1)*3;
+				var faHalfWidth = faLength / 2;
+				var faMidPoint = Math.round(faHalfWidth);
 	
 				fracArray = initFracArray(fracArray, fcX, fcY, mag, maxIter, worldWidth);
 				
@@ -127,16 +139,10 @@
 				}
 				
 				function initFracArray(fa, fracCtrX, fracCtrY, fracMag, fracMaxIter, fracRez) {
-					// determine the size of the array
-					var faLength = fa.length;
-					var faHalfLength = faLength / 2;
-					
 					// determine the increment (distance) between pixels based on mag and resolution
 					// (assume that at 1x, min/max are all 1.0 out on their respective axes)
 					var radius = 1 / fracMag;
 					var incr = radius / (fracRez / 2);
-					
-					//alert("incr: " + incr);
 					
 					// loop through and populate each position in fracArray with an array containing pieces of info:
 					var pixelX; 		//  [0] center X of "pixel" in fractal space
@@ -145,12 +151,12 @@
 				 	var valProcessed; //  [3] stretched and eroded iter value
 					for (var y = 0; y < faLength; y ++) {
 						for (var x = 0; x < faLength; x ++) {
-							fa[x][y] = [];
-							pixelX = fracCtrX + (incr * (x - faHalfLength)); 
-							pixelY = fracCtrY + (incr * (y - faHalfLength)); 
+							fa[y][x] = [];
+							pixelX = fracCtrX + (incr * (x - faHalfWidth)); 
+							pixelY = fracCtrY + (incr * (y - faHalfWidth)); 
 							valRaw = calcRawIter2(pixelX,pixelY);
 							valProcessed = (Math.log(Math.log(Math.log(valRaw))) * 1000) - 500;
-							fa[x][y] = [pixelX, pixelY, valRaw, valProcessed];
+							fa[y][x] = [pixelX, pixelY, valRaw, valProcessed];
 						}
 					}
 					
@@ -194,13 +200,13 @@
 	
 					// CAMERA
 					camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 20000 );
-					camera.position.set(-1500,100,-1500);
+					camera.position.set(-1500,300,-1500);
 					camera.up = new THREE.Vector3(0,1,0);
 	
 					// ACTION :-)
 					controls = new THREE.FirstPersonControls( camera );
-					controls.movementSpeed = 300;
-					controls.lookSpeed = 0.3;
+					controls.movementSpeed = 200;
+					controls.lookSpeed = 0.2;
 	
 					geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
 					geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
@@ -214,7 +220,7 @@
 	
 					var iX = 0, iY = 0;
 					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					   geometry.vertices[i].y = fracArray[iX][iY][3];
+					   geometry.vertices[i].y = fracArray[iX + worldWidth - 1][iY + worldWidth - 1][3];
 
 					   // get the appropriate value from the appropriate location in the fracArray
 					   iX++;
@@ -264,7 +270,7 @@
 				// 	container.appendChild( stats.domElement );
 	
 					window.addEventListener( 'resize', onWindowResize, false );
-	
+					
 				}
 	
 				function render() {
@@ -275,9 +281,6 @@
 					var needToUpdate = false;
 					
 					//var middleVertexIndex = geometry.vertices.length/2;
-					
-					var jhStats = document.getElementById("jhStats");
-					jhStats.innerHTML = "(X,Z,Y): " + camera.position.x + "," + camera.position.z + "," + camera.position.y;
 					
 					// if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
 					// 	 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
@@ -327,8 +330,6 @@
 						var worldY;
 						for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
 		
-							//geometry.vertices[ i ].y = 135 * Math.sin( i / 5 + ( time + i ) / 7 );
-						   //geometry.vertices[i].y = (i-8192)/8;
 						   worldY = calcRawIter(geometry.vertices[i].x,geometry.vertices[i].z);
 						   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
 						   geometry.vertices[i].y = worldY;
@@ -361,10 +362,9 @@
 					}
 	
 					var jhStats = document.getElementById("jhStats");
-					jhStats.innerHTML = "(X,Z,Y): " + Math.round(camera.position.x) + "," + Math.round(camera.position.z) + "," + Math.round(camera.position.y) + "<br>";// +
-											//	"CamHovHeight: " + intersects[0].distance;
+					jhStats.innerHTML = "(X,Z,Y): " + camera.position.x.toFixed(2) + "," + camera.position.z.toFixed(2) + "," + camera.position.y.toFixed(2) + "<br>" +
+												"Center fX, fY: " + fracArray[faMidPoint][faMidPoint][0].toFixed(6) + ", " + fracArray[faMidPoint][faMidPoint][1].toFixed(6);
 					
-	
 					controls.update( delta );
 					renderer.render( scene, camera );
 	
@@ -444,8 +444,10 @@
 				}
 				
 				function calcRawIter(worldX, worldZ) {
-					var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
-					var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
+					// var cX = (worldX + (fcX * scaleFactor * mag)) / (scaleFactor * mag); 
+					// var cY = (worldZ + (fcY * scaleFactor * mag)) / (scaleFactor * mag);
+					var cX = (worldX + (fcX *  mag)) / (mag); 
+					var cY = (worldZ + (fcY * mag)) / (mag);
 					var arrCalc = fracUtils.getIter(cX, cY, 10, maxIter);
 					var returnVal = arrCalc[0];
 					return returnVal;
