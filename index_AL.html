@@ -108,8 +108,9 @@
 
 					
 				// specify resolution of the world
-				var worldWidth = 256, worldDepth = 256,
-				worldHalfWidth = worldWidth / 2, worldHalfDepth = worldDepth / 2;
+				var worldRezX = 256, worldRezZ = 256,
+				worldHalfRezX = worldRezX / 2, worldHalfRezZ = worldRezZ / 2;
+				var worldPixelsX = 4096, worldPixelsZ = 4096;
 				
 				// How many world units equals one (unmagnified) unit fractal space?
 				// var scaleFactor = 500; // UNUSED
@@ -124,14 +125,14 @@
 				// FRACARRAY - an array of arrays of fractal values (in an array) 
 				// Holds pre-calc'd heights and other values separate from PlaneGeometry.
 				// fracArray[posY][posX][ fX, fY, raw, processed ]
-				var fracArray = createFracArray((worldWidth-1)*3); 
+				var fracArray = createFracArray((worldRezX-1)*3); 
 				var faOffsetX = 0; 
 				var faOffsetY = 0;
-				var faLength = (worldWidth-1)*3;
+				var faLength = (worldRezX-1)*3;
 				var faHalfWidth = faLength / 2;
 				var faMidPoint = Math.round(faHalfWidth);
 	
-				fracArray = initFracArray(fracArray, fcX, fcY, mag, maxIter, worldWidth);
+				fracArray = initFracArray(fracArray, fcX, fcY, mag, maxIter, worldRezX);
 				
 				init();
 			   animate();
@@ -160,7 +161,7 @@
 							fa[y][x] = [];
 							pixelX = fracCtrX + (incr * (x - faHalfWidth)); 
 							pixelY = fracCtrY + (incr * (y - faHalfWidth)); 
-							valRaw = calcRawIter2(pixelX,pixelY);
+							valRaw = fracUtils.getIter(pixelX, pixelY, 10, maxIter)[0];
 							valProcessed = (Math.log(Math.log(Math.log(valRaw))) * 1000) - 500;
 							fa[y][x] = [pixelX, pixelY, valRaw, valProcessed];
 						}
@@ -214,7 +215,7 @@
 					controls.movementSpeed = 100;
 					controls.lookSpeed = 0.2;
 	
-					geometry = new THREE.PlaneGeometry( 4096, 4096, worldWidth - 1, worldDepth - 1 );
+					geometry = new THREE.PlaneGeometry( worldPixelsX, worldPixelsZ, worldRezX - 1, worldRezZ - 1 );
 					geometry.applyMatrix( new THREE.Matrix4().makeRotationX( - Math.PI / 2 ) );
 					geometry.dynamic = true;
 	
@@ -226,11 +227,11 @@
 	
 					var iX = 0, iY = 0;
 					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					   geometry.vertices[i].y = fracArray[iX + worldWidth - 1][iY + worldDepth - 1][3];
+					   geometry.vertices[i].y = fracArray[iX + worldRezX - 1][iY + worldRezZ - 1][3];
 
 					   // get the appropriate value from the appropriate location in the fracArray
 					   iX++;
-					   if (iX==worldWidth) {
+					   if (iX==worldRezX) {
 					   	iX = 0;
 					   	iY++;
 					   }
@@ -246,7 +247,7 @@
 	
 	
 					//color the vertices
-					// geometry = fracUtils.calcVertexColors(geometry);
+					//geometry = fracUtils.calcVertexColors(geometry);
 					
 					mesh = new THREE.Mesh( geometry, vertexColorMaterial );
 					//scene.add( mesh ); // unnecc -- why?
@@ -254,10 +255,10 @@
 					// "wireframe texture"
 					var wireTexture = new THREE.ImageUtils.loadTexture( './square.png' );
 					wireTexture.wrapS = wireTexture.wrapT = THREE.RepeatWrapping; 
-					wireTexture.repeat.set( 40, 40 );
+					wireTexture.repeat.set( 64, 64 );
 	
 					var wireMaterial = new THREE.MeshBasicMaterial( { map: wireTexture, vertexColors: THREE.VertexColors } );
-					wireMaterial.map.repeat.set( worldWidth, worldDepth );
+					wireMaterial.map.repeat.set( worldRezX, worldRezZ );
 	
 					var graphMesh = new THREE.Mesh( geometry, wireMaterial );
 					graphMesh.doubleSided = true;
@@ -286,105 +287,26 @@
 					var delta = clock.getDelta(),
 						time = clock.getElapsedTime() * 10;
 					
-					var needToUpdate = false;
-					
-					//var middleVertexIndex = geometry.vertices.length/2;
-					
-					// if (Math.abs(camera.position.x - geometry.vertices[middleVertexIndex].x) > 3000 ||
-					// 	 Math.abs(camera.position.z - geometry.vertices[middleVertexIndex].z) > 3000) {
-						//
-						// modify the vertices in some fashion here
-						// 
-						// var centerX = geometry.vertices[middleVertexIndex].x;
-						// var centerZ = geometry.vertices[middleVertexIndex].z;
-						// for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-						// 	// move each vertex 0.1% further from the center
-						// 	deltaX = geometry.vertices[i].x - centerX;
-						// 	deltaZ = geometry.vertices[i].z - centerZ;
-						// 	geometry.vertices[i].x += (deltaX*0.001);
-						// 	geometry.vertices[i].z += (deltaZ*0.001);
-							
-						// }
-						
-					// 	mesh.geometry.verticesNeedUpdate = true;
-					// }
-					
-					var landscapeNeedsUpdate = false;
-					
-					// reposition the player
-					// if (Math.abs(camera.position.x) > 25 || Math.abs(camera.position.z) > 25) {
-					// 	resetPosition();
-					// 	timesToGrowLandscape += 50;
-					// 	landscapeNeedsUpdate = false;
-					// }
-					
-					// shift the landscape
-					// if (Math.abs(camera.position.x) >= worldWidth) {
-					// 	shiftAlongAxis('X');
-					// }
-					// if (Math.abs(camera.position.z) >= worldDepth) {
-					// 	shiftAlongAxis('Z');
-					// }
-
-					// add/remove from the landscape
-					// if (camera.position.x >= worldWidth) {
-					// 	addRemoveAlongAxis("X", 1);
-					// }
-					// if (camera.position.x <= worldWidth*-1) {
-					// 	addRemoveAlongAxis("X", -1);
-					// }
-					// if (camera.position.z >= worldWidth) {
-					// 	addRemoveAlongAxis("Z", 1);
-					// }
-					// if (camera.position.z <= worldWidth*-1) {
-					// 	addRemoveAlongAxis("Z", -1);
-					// }
-					
 					// move the landscape if needed
-					if (camera.position.x >= worldWidth) {
-						moveLandscape("X", 1, 1);
+					if (camera.position.x >= worldRezX * 2) {
+						moveLandscape("X", 1, 2);
 					}
-					if (camera.position.x <= worldWidth*-1) {
-						moveLandscape("X", -1, 1);
+					if (camera.position.x <= worldRezX*-2) {
+						moveLandscape("X", -1, 2);
 					}
-					if (camera.position.z >= worldDepth) {
-						moveLandscape("Z", 1, 1);
+					if (camera.position.z >= worldRezZ * 2) {
+						moveLandscape("Z", 1, 2);
 					}
-					if (camera.position.z <= worldDepth*-1) {
-						moveLandscape("Z", -1, 1);
+					if (camera.position.z <= worldRezZ*-2) {
+						moveLandscape("Z", -1, 2);
 					}
-					
-					
 					
 					// grow landscape if needed
-					if (timesToGrowLandscape > 0) {
-						growLandscape();
-						timesToGrowLandscape--;
-					}
+					// if (timesToGrowLandscape > 0) {
+					// 	growLandscape();
+					// 	timesToGrowLandscape--;
+					// }
 					
-					// Update the landscape
-					if (landscapeNeedsUpdate) {
-						var worldY;
-						for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-		
-						   worldY = calcRawIter(geometry.vertices[i].x,geometry.vertices[i].z);
-						   worldY = (Math.log(Math.log(worldY)) * 500) - 500;
-						   geometry.vertices[i].y = worldY;
-						}
-						
-						for (var z = 0; z < 2; z++) {
-							erodeLandscape();
-						}
-			
-						//geometry.computeFaceNormals();
-						//geometry.computeVertexNormals();
-		
-						mesh.geometry.verticesNeedUpdate = true;
-						//mesh.geometry.normalsNeedUpdate = true;
-					} else {
-						geometry = geometry;
-					}
-	
 					// update the elevation of the camera
 					var eVector = new THREE.Vector3(0,-1,0);
 					var eRayCaster = new THREE.Raycaster(camera.position, eVector);
@@ -398,14 +320,12 @@
 						}
 					}
 					
-					// recolor the landscape
+					// recolor the landscape -- NOT WORKING
 					if (landscapeNeedsRecoloring) {
 						geometry = fracUtils.calcVertexColors(geometry);
 						landscapeNeedsRecoloring = false;
 					}
 					
-
-	
 					var jhStats = document.getElementById("jhStats");
 					jhStats.innerHTML = "(X,Z,Y): " + camera.position.x.toFixed(2) + "," + camera.position.z.toFixed(2) + "," + camera.position.y.toFixed(2) + "<br>" +
 												"Center fX, fY: " + fracArray[faMidPoint][faMidPoint][0].toFixed(6) + ", " + fracArray[faMidPoint][faMidPoint][1].toFixed(6);
@@ -424,7 +344,8 @@
 					return outGeom;
 				}
 	
-				function moveLandscape(axis, dir, amount) {
+
+					function moveLandscape(axis, dir, amount) {
 					// shift the landscape without scaling and return camera to 0,0
 					controls.freeze = true;
 					
@@ -436,34 +357,32 @@
 					// (another function will reset the offsets when new patches of fracArray are calc'd)
 					if (axis.toUpperCase()=='X') {
 						if (dir>0) {
-							faOffsetX += amount * 16;
-							newCamX = camera.position.x - (worldWidth * amount);
+							faOffsetX += amount * (worldPixelsX / worldRezX);
+							newCamX = camera.position.x - (worldRezX * amount);
 						} else {
-							faOffsetX -= amount * 16;
-							newCamX = camera.position.x + (worldWidth * amount);
+							faOffsetX -= amount * (worldPixelsX / worldRezX);
+							newCamX = camera.position.x + (worldRezX * amount);
 						}
 					} else {
 						if (dir>0) {
-							faOffsetY += amount * 16;
-							newCamZ = camera.position.z - (worldDepth * amount);
+							faOffsetY += amount * (worldPixelsZ / worldRezZ);
+							newCamZ = camera.position.z - (worldRezZ * amount);
 						} else {
-							faOffsetY -= amount * 16;
-							newCamZ = camera.position.z + (worldDepth * amount);
+							faOffsetY -= amount * (worldPixelsZ / worldRezZ);
+							newCamZ = camera.position.z + (worldRezZ * amount);
 						}
 					}
 					// repull from FracArray
-					controls.freeze = true;
 					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					   geometry.vertices[i].y = fracArray[iX + worldWidth - 1 + faOffsetX][iY + worldDepth - 1 + faOffsetY][3];
+					   geometry.vertices[i].y = fracArray[iX + worldRezX - 1 + faOffsetX][iY + worldRezZ - 1 + faOffsetY][3];
 					   iX++;
-					   if (iX==worldWidth) {
+					   if (iX==worldRezX) {
 					   	iX = 0;
 					   	iY++;
 					   }
 					}
 
 					mesh.geometry.verticesNeedUpdate = true;
-					//landscapeNeedsRecoloring = true;
 
 					// reposition the camera
 					camera.position.x = newCamX;
@@ -472,56 +391,7 @@
 					controls.freeze = false;
 				
 				}
-	
-				function shiftAlongAxis(axis) {
-					controls.freeze = true;
-					var deltaCamera;
-					if (axis.toUpperCase()=='X') {
-						deltaCamera = camera.position.x;
-						for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
-							geometry.vertices[i].x = geometry.vertices[i].x - deltaCamera;
-						}
-						camera.position.x = 0;
-					} else {
-						deltaCamera = camera.position.z;
-						for (var i = 0, l = geometry.vertices.length; i < l; i++ ) {
-							geometry.vertices[i].z = geometry.vertices[i].z - deltaCamera;
-						}
-						camera.position.z = 0;
-					}
-					controls.freeze = false;
-					mesh.geometry.verticesNeedUpdate = true;
-				}
-				
-				function addRemoveAlongAxis(axis, dir) {
-					var iX = 0, iY = 0;
-					if (axis.toUpperCase()=='X') {
-						if (dir>0) {
-							faOffsetX += 1;
-						} else {
-							faOffsetX -= 1;
-						}
-					} else {
-						if (dir>0) {
-							faOffsetY += 1;
-						} else {
-							faOffsetY -= 1;
-						}
-					}
-					// repull from FracArray
-					controls.freeze = true;
-					for ( var i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-					   geometry.vertices[i].y = fracArray[iX + worldWidth - 1 + faOffsetX][iY + worldDepth - 1 + faOffsetY][3];
-					   iX++;
-					   if (iX==worldWidth) {
-					   	iX = 0;
-					   	iY++;
-					   }
-					}
-					controls.freeze = false;
-					mesh.geometry.verticesNeedUpdate = true;
-				}
-	
+
 				function growLandscape() {
 					// increase distance of each vertex from origin by a small factor
 					
@@ -576,14 +446,6 @@
 					return returnVal;
 				}
 	
-				function calcRawIter2(cX, cY) {
-					var arrCalc = fracUtils.getIter(cX, cY, 10, maxIter);
-					var returnVal = arrCalc[0];
-					return returnVal;
-				}
-				
-
-				
 				function erodeLandscape() {
 						// erode the landscape
 						var erosion = [];
@@ -592,15 +454,15 @@
 						var hnN, hnW, hnE, hnS; 
 						//alert("Original height of i = " + geometry.vertices[testi].y);
 						for ( i = 0, l = geometry.vertices.length; i < l; i ++ ) {
-							iN = fracUtils.getNeighborIndex(i, worldWidth, "N");
-							iW = fracUtils.getNeighborIndex(i, worldWidth, "W");
-							iE = fracUtils.getNeighborIndex(i, worldWidth, "E");
-							iS = fracUtils.getNeighborIndex(i, worldWidth, "S");
+							iN = fracUtils.getNeighborIndex(i, worldRezX, "N");
+							iW = fracUtils.getNeighborIndex(i, worldRezX, "W");
+							iE = fracUtils.getNeighborIndex(i, worldRezX, "E");
+							iS = fracUtils.getNeighborIndex(i, worldRezX, "S");
 							if (iN!=null) {hnN = geometry.vertices[iN].y;} else {hnN=null;}
 							if (iW!=null) {hnW = geometry.vertices[iW].y;} else {hnW=null;}
 							if (iE!=null) {hnE = geometry.vertices[iE].y;} else {hnE=null;}
 							if (iS!=null) {hnS = geometry.vertices[iS].y;} else {hnS=null;}
-							erosion = fracUtils.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldWidth); 
+							erosion = fracUtils.erodeHeight(i, geometry.vertices[i].y, hnN, hnW, hnE, hnS, worldRezX); 
 							geometry.vertices[i].y = erosion[0];
 							iTarget = erosion[1];
 							geometry.vertices[iTarget].y += erosion[2];
